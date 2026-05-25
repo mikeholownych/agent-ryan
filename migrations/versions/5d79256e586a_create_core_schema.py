@@ -1,7 +1,7 @@
 """create core schema
 
 Revision ID: 5d79256e586a
-Revises: 
+Revises:
 Create Date: 2026-05-25 12:13:24.271338
 """
 
