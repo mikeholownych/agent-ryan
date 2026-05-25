@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from ryan.config import get_settings
 from ryan.db import Base
+import ryan.models  # noqa: F401
 
 config = context.config
 
