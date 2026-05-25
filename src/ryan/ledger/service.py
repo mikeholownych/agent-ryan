@@ -80,12 +80,14 @@ def append_compensating_entry(
             f"ledger entry {original_entry_id!r} was not found"
         )
 
-    correction_metadata: dict[str, Any] = {
+    correction_metadata: dict[str, Any] = dict(metadata or {})
+    correction_metadata.update(
+        {
         "compensates_ledger_entry_id": original.id,
         "original_reference_type": original.reference_type,
         "original_reference_id": original.reference_id,
-    }
-    correction_metadata.update(metadata or {})
+        }
+    )
 
     return append_ledger_entry(
         session,

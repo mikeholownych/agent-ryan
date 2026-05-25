@@ -208,6 +208,58 @@ def test_append_compensating_entry_links_to_original_without_mutating_it(sqlite_
     }
 
 
+def test_compensating_entry_metadata_cannot_override_canonical_audit_linkage(
+    sqlite_session,
+):
+    from ryan.ledger.service import append_compensating_entry, append_ledger_entry
+
+    original = append_ledger_entry(
+        sqlite_session,
+        type="payment_settled",
+        amount=Decimal("100.00"),
+        currency="USD",
+        reference_type="payment",
+        reference_id="payment-123",
+        actor="payments-service",
+        metadata={},
+    )
+
+    compensation = append_compensating_entry(
+        sqlite_session,
+        original_entry_id=original.id,
+        type="payment_correction",
+        actor="operator",
+        metadata={
+            "compensates_ledger_entry_id": "forged-entry",
+            "original_reference_type": "wallet",
+            "original_reference_id": "wallet-123",
+            "reason": "operator correction",
+        },
+    )
+
+    assert compensation.metadata_["compensates_ledger_entry_id"] == original.id
+    assert compensation.metadata_["original_reference_type"] == "payment"
+    assert compensation.metadata_["original_reference_id"] == "payment-123"
+    assert compensation.metadata_["reason"] == "operator correction"
+
+
+def test_compensating_missing_ledger_entry_raises_without_appending(sqlite_session):
+    from ryan.ledger.service import (
+        LedgerEntryNotFoundError,
+        append_compensating_entry,
+    )
+
+    with pytest.raises(LedgerEntryNotFoundError, match="missing-entry"):
+        append_compensating_entry(
+            sqlite_session,
+            original_entry_id="missing-entry",
+            type="missing_correction",
+            actor="operator",
+        )
+
+    assert sqlite_session.scalars(select(LedgerEntry)).all() == []
+
+
 def test_ledger_service_does_not_expose_update_or_delete_helpers():
     import ryan.ledger.service as ledger_service
 
