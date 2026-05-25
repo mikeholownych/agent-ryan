@@ -22,10 +22,18 @@ def test_settings_load_sandbox_defaults(monkeypatch):
 
     from ryan.config import Settings
 
-    settings = Settings()
+    settings = Settings(_env_file=None)
 
     assert settings.environment == "sandbox"
     assert settings.database_url == "sqlite:///./ryan.sqlite3"
+
+
+def test_gitignore_excludes_local_env_files():
+    ignored_patterns = Path(".gitignore").read_text().splitlines()
+
+    assert ".env" in ignored_patterns
+    assert ".env.*" in ignored_patterns
+    assert "!.env.example" in ignored_patterns
 
 
 def test_required_module_layout_imports_cleanly():

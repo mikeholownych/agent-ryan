@@ -3,5 +3,8 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+.env
+.env.*
+!.env.example
 ryan.sqlite3
 ryan.sqlite3-*
