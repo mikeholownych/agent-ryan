@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -70,6 +70,9 @@ def _create_required_rules(
     session,
     *,
     spend_threshold_configuration: dict | None = None,
+    category_budget_configuration: dict | None = None,
+    revenue_floor_configuration: dict | None = None,
+    reserve_minimum_configuration: dict | None = None,
 ):
     create_policy_rule(
         session,
@@ -97,7 +100,8 @@ def _create_required_rules(
     create_policy_rule(
         session,
         rule_type="category_budget",
-        configuration={
+        configuration=category_budget_configuration
+        or {
             "budgets": [
                 {
                     "category": "software",
@@ -130,14 +134,16 @@ def _create_required_rules(
     create_policy_rule(
         session,
         rule_type="revenue_floor",
-        configuration={"amount": "10.00", "currency": "USD"},
+        configuration=revenue_floor_configuration
+        or {"amount": "10.00", "currency": "USD"},
         actor="operator:test",
         priority=5,
     )
     create_policy_rule(
         session,
         rule_type="reserve_minimum",
-        configuration={"amount": "5.00", "currency": "USD"},
+        configuration=reserve_minimum_configuration
+        or {"amount": "5.00", "currency": "USD"},
         actor="operator:test",
         priority=6,
     )
@@ -298,6 +304,21 @@ def test_time_window_mismatch_rejects_fail_closed(sqlite_session):
     assert decision.rule_results["time_window"]["passed"] is False
 
 
+def test_time_window_evaluation_converts_aware_timestamp_to_utc(sqlite_session):
+    _create_wallets(sqlite_session)
+    _create_required_rules(sqlite_session)
+
+    decision = evaluate_policy(
+        sqlite_session,
+        request=_expense_request(reference_id="expense-non-utc-time"),
+        # 12:00 at UTC+05:00 is 07:00 UTC, outside the 09-17 UTC window.
+        timestamp=datetime(2026, 5, 25, 12, 0, tzinfo=timezone(timedelta(hours=5))),
+    )
+
+    assert decision.decision == "reject"
+    assert "outside active policy time window" in decision.reason
+
+
 def test_uncertain_spend_threshold_config_rejects_fail_closed(sqlite_session):
     _create_wallets(sqlite_session)
     _create_required_rules(
@@ -316,6 +337,109 @@ def test_uncertain_spend_threshold_config_rejects_fail_closed(sqlite_session):
         decision.reason
     )
     assert decision.rule_results["spend_threshold"]["decision"] == "reject"
+
+
+def test_malformed_numeric_policy_config_rejects_with_persisted_decision(
+    sqlite_session,
+):
+    _create_wallets(sqlite_session)
+    _create_required_rules(
+        sqlite_session,
+        spend_threshold_configuration={
+            "per_transaction_cap": "NaN",
+            "currency": "USD",
+        },
+    )
+
+    decision = evaluate_policy(
+        sqlite_session,
+        request=_expense_request(reference_id="expense-nan-threshold"),
+        timestamp=_monday_noon(),
+    )
+
+    assert decision.decision == "reject"
+    assert "spend threshold rule is missing required currency or cap" in (
+        decision.reason
+    )
+    assert sqlite_session.get(PolicyDecision, decision.id) is not None
+
+
+def test_revenue_floor_and_reserve_minimum_currency_mismatch_rejects(
+    sqlite_session,
+):
+    _create_wallets(sqlite_session)
+    _create_required_rules(
+        sqlite_session,
+        revenue_floor_configuration={"amount": "10.00", "currency": "EUR"},
+    )
+
+    revenue_floor_decision = evaluate_policy(
+        sqlite_session,
+        request=_expense_request(reference_id="expense-revenue-currency-mismatch"),
+        timestamp=_monday_noon(),
+    )
+
+    assert revenue_floor_decision.decision == "reject"
+    assert "revenue floor rule is missing required currency or amount" in (
+        revenue_floor_decision.reason
+    )
+
+    sqlite_session.rollback()
+    _create_wallets(sqlite_session)
+    _create_required_rules(
+        sqlite_session,
+        reserve_minimum_configuration={"amount": "5.00", "currency": "EUR"},
+    )
+
+    reserve_minimum_decision = evaluate_policy(
+        sqlite_session,
+        request=_expense_request(reference_id="expense-reserve-currency-mismatch"),
+        timestamp=_monday_noon(),
+    )
+
+    assert reserve_minimum_decision.decision == "reject"
+    assert "reserve minimum rule is missing required currency or amount" in (
+        reserve_minimum_decision.reason
+    )
+
+
+def test_negative_floor_and_minimum_policy_config_rejects_fail_closed(
+    sqlite_session,
+):
+    _create_wallets(sqlite_session, revenue_balance=Decimal("0.00"))
+    _create_required_rules(
+        sqlite_session,
+        revenue_floor_configuration={"amount": "-10.00", "currency": "USD"},
+    )
+
+    revenue_floor_decision = evaluate_policy(
+        sqlite_session,
+        request=_expense_request(reference_id="expense-negative-revenue-floor"),
+        timestamp=_monday_noon(),
+    )
+
+    assert revenue_floor_decision.decision == "reject"
+    assert "revenue floor rule is missing required currency or amount" in (
+        revenue_floor_decision.reason
+    )
+
+    sqlite_session.rollback()
+    _create_wallets(sqlite_session, operating_balance=Decimal("0.00"))
+    _create_required_rules(
+        sqlite_session,
+        reserve_minimum_configuration={"amount": "-5.00", "currency": "USD"},
+    )
+
+    reserve_minimum_decision = evaluate_policy(
+        sqlite_session,
+        request=_expense_request(reference_id="expense-negative-reserve-minimum"),
+        timestamp=_monday_noon(),
+    )
+
+    assert reserve_minimum_decision.decision == "reject"
+    assert "reserve minimum rule is missing required currency or amount" in (
+        reserve_minimum_decision.reason
+    )
 
 
 def test_revenue_floor_or_operating_minimum_blocks_spend(sqlite_session):
@@ -355,6 +479,49 @@ def test_revenue_floor_or_operating_minimum_blocks_spend(sqlite_session):
     )
     assert alert is not None
     assert alert.reference_id == operating_minimum_decision.id
+
+
+def test_category_budget_only_counts_spend_inside_configured_period(sqlite_session):
+    _create_wallets(sqlite_session, operating_balance=Decimal("150.00"))
+    _create_required_rules(
+        sqlite_session,
+        category_budget_configuration={
+            "budgets": [
+                {
+                    "category": "software",
+                    "limit": "100.00",
+                    "currency": "USD",
+                    "period": "monthly",
+                }
+            ]
+        },
+    )
+    sqlite_session.add(
+        ExpenseRequest(
+            vendor="sandbox-approved-vendor",
+            category="software",
+            amount=Decimal("95.00"),
+            currency="USD",
+            rationale="previous month spend",
+            policy_status="approved",
+            execution_status="executed",
+            created_by_actor="agent:ryan",
+            created_at=datetime(2026, 4, 30, 12, 0, tzinfo=UTC),
+        )
+    )
+    sqlite_session.flush()
+
+    decision = evaluate_policy(
+        sqlite_session,
+        request=_expense_request(
+            amount=Decimal("10.00"),
+            reference_id="expense-new-month-budget",
+        ),
+        timestamp=_monday_noon(),
+    )
+
+    assert decision.decision == "approve"
+    assert decision.rule_results["category_budget"]["current_spend"] == "0.00"
 
 
 def test_frozen_or_locked_wallet_rejects(sqlite_session):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -274,6 +274,7 @@ def evaluate_policy(
         session,
         rules["category_budget"],
         request,
+        occurred_at,
     )
     rule_results["category_budget"] = category_budget_result
     if not category_budget_result["passed"]:
@@ -478,7 +479,10 @@ def _evaluate_spend_threshold(
     rule: PolicyRule,
     request: PolicyEvaluationRequest,
 ) -> dict[str, Any]:
-    cap = _decimal_from_config(rule.configuration.get("per_transaction_cap"))
+    cap = _decimal_from_config(
+        rule.configuration.get("per_transaction_cap"),
+        allow_zero=False,
+    )
     if cap is None or rule.configuration.get("currency") != request.currency:
         return {
             "passed": False,
@@ -508,6 +512,7 @@ def _evaluate_category_budget(
     session: Session,
     rule: PolicyRule,
     request: PolicyEvaluationRequest,
+    timestamp: datetime,
 ) -> dict[str, Any]:
     budget = _matching_category_budget(rule, request)
     if budget is None:
@@ -519,7 +524,7 @@ def _evaluate_category_budget(
             "currency": request.currency,
         }
 
-    limit = _decimal_from_config(budget.get("limit"))
+    limit = _decimal_from_config(budget.get("limit"), allow_zero=False)
     if limit is None:
         return {
             "passed": False,
@@ -528,11 +533,24 @@ def _evaluate_category_budget(
             "category": request.category,
         }
 
+    period_start = _period_start(
+        budget.get("period"),
+        timestamp if timestamp.tzinfo else timestamp.replace(tzinfo=UTC),
+    )
+    if period_start is None:
+        return {
+            "passed": False,
+            "decision": "reject",
+            "reason": "category budget rule is missing a valid period",
+            "category": request.category,
+        }
+
     current_spend = session.scalar(
         select(func.coalesce(func.sum(ExpenseRequest.amount), Decimal("0.00"))).where(
             ExpenseRequest.category == request.category,
             ExpenseRequest.currency == request.currency,
             ExpenseRequest.policy_status.in_(APPROVED_EXPENSE_STATUSES),
+            ExpenseRequest.created_at >= period_start,
         )
     )
     projected_spend = Decimal(current_spend or Decimal("0.00")) + request.amount
@@ -576,7 +594,9 @@ def _evaluate_time_window(
     rule: PolicyRule,
     timestamp: datetime,
 ) -> dict[str, Any]:
-    occurred_at = timestamp if timestamp.tzinfo else timestamp.replace(tzinfo=UTC)
+    occurred_at = (
+        timestamp.astimezone(UTC) if timestamp.tzinfo else timestamp.replace(tzinfo=UTC)
+    )
     day = occurred_at.strftime("%a").lower()[:3]
     for window in rule.configuration.get("windows") or []:
         start_hour = window.get("start_hour_utc")
@@ -607,11 +627,11 @@ def _evaluate_revenue_floor(
     request: PolicyEvaluationRequest,
 ) -> dict[str, Any]:
     floor = _decimal_from_config(rule.configuration.get("amount"))
-    if floor is None:
+    if floor is None or rule.configuration.get("currency") != request.currency:
         return {
             "passed": False,
             "decision": "reject",
-            "reason": "revenue floor rule is missing a valid amount",
+            "reason": "revenue floor rule is missing required currency or amount",
         }
 
     revenue_wallet = _wallet_by_type_and_currency(
@@ -650,11 +670,11 @@ def _evaluate_reserve_minimum(
     source_wallet: Wallet,
 ) -> dict[str, Any]:
     minimum = _decimal_from_config(rule.configuration.get("amount"))
-    if minimum is None:
+    if minimum is None or rule.configuration.get("currency") != request.currency:
         return {
             "passed": False,
             "decision": "reject",
-            "reason": "reserve minimum rule is missing a valid amount",
+            "reason": "reserve minimum rule is missing required currency or amount",
         }
 
     projected_balance = source_wallet.balance - request.amount
@@ -679,13 +699,30 @@ def _evaluate_reserve_minimum(
     }
 
 
-def _decimal_from_config(value: Any) -> Decimal | None:
+def _period_start(period: Any, timestamp: datetime) -> datetime | None:
+    occurred_at = timestamp.astimezone(UTC)
+    if period == "daily":
+        return occurred_at.replace(hour=0, minute=0, second=0, microsecond=0)
+    if period == "weekly":
+        day_start = occurred_at.replace(hour=0, minute=0, second=0, microsecond=0)
+        return day_start - timedelta(days=occurred_at.weekday())
+    if period == "monthly":
+        return occurred_at.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    return None
+
+
+def _decimal_from_config(value: Any, *, allow_zero: bool = True) -> Decimal | None:
     try:
         if value is None:
             return None
-        return Decimal(str(value))
+        parsed = Decimal(str(value))
     except (InvalidOperation, ValueError):
         return None
+    if not parsed.is_finite():
+        return None
+    if parsed < Decimal("0") or (not allow_zero and parsed <= Decimal("0")):
+        return None
+    return parsed
 
 
 def _json_safe(value: Any) -> Any:
