@@ -120,3 +120,39 @@ def test_seed_validation_fails_closed_when_mvp_wallet_allocation_is_missing(
 
     with pytest.raises(ValueError, match="revenue, operating, and reserve"):
         seed_mvp_data(sqlite_session, invalid_settings)
+
+
+def test_seed_validation_fails_closed_without_approved_sources_or_vendors(
+    sqlite_session,
+    sandbox_settings,
+):
+    inactive_source_settings = sandbox_settings.model_copy(
+        update={
+            "approved_demand_sources": [
+                source.model_copy(update={"status": "inactive"})
+                for source in sandbox_settings.approved_demand_sources
+            ]
+        }
+    )
+    with pytest.raises(ValueError, match="approved_demand_sources"):
+        seed_mvp_data(sqlite_session, inactive_source_settings)
+
+    inactive_vendor_settings = sandbox_settings.model_copy(
+        update={
+            "vendor_allowlist": [
+                vendor.model_copy(update={"status": "inactive"})
+                for vendor in sandbox_settings.vendor_allowlist
+            ]
+        }
+    )
+    with pytest.raises(ValueError, match="vendor_allowlist"):
+        seed_mvp_data(sqlite_session, inactive_vendor_settings)
+
+
+def test_seed_mvp_data_leaves_transaction_commit_to_caller(
+    sqlite_session,
+    sandbox_settings,
+):
+    seed_mvp_data(sqlite_session, sandbox_settings)
+
+    assert sqlite_session.in_transaction()

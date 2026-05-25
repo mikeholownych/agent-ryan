@@ -21,7 +21,6 @@ def seed_mvp_data(session: Session, settings: Settings) -> None:
     _seed_policy_rules(session, settings)
     _seed_wallets(session, settings)
     _seed_inactive_kill_switch(session)
-    session.commit()
 
 
 def _validate_mvp_seed_configuration(settings: Settings) -> None:
@@ -32,10 +31,10 @@ def _validate_mvp_seed_configuration(settings: Settings) -> None:
     if len(active_offers) != 1:
         raise ValueError("offer_catalog must contain exactly one active MVP offer")
 
-    if not settings.approved_demand_sources:
+    if not _approved_demand_sources(settings):
         raise ValueError("approved_demand_sources must contain at least one source")
 
-    if not settings.vendor_allowlist:
+    if not _approved_vendors(settings):
         raise ValueError("vendor_allowlist must contain at least one vendor")
 
     configured_wallets = set(settings.revenue_allocation.wallet_percentages)
@@ -94,7 +93,7 @@ def _seed_offer(session: Session, settings: Settings) -> None:
 
 
 def _seed_demand_source_placeholders(session: Session, settings: Settings) -> None:
-    for source_config in settings.approved_demand_sources:
+    for source_config in _approved_demand_sources(settings):
         source_reference = f"seed:{source_config.name}"
         source = session.scalar(
             select(Lead).where(
@@ -133,7 +132,7 @@ def _seed_policy_rules(session: Session, settings: Settings) -> None:
                         "categories": vendor.categories,
                         "status": vendor.status,
                     }
-                    for vendor in settings.vendor_allowlist
+                    for vendor in _approved_vendors(settings)
                 ]
             },
         ),
@@ -246,6 +245,18 @@ def _seed_inactive_kill_switch(session: Session) -> None:
 
 def _active_offer(settings: Settings):
     return next(offer for offer in settings.offer_catalog if offer.status == "active")
+
+
+def _approved_demand_sources(settings: Settings):
+    return [
+        source
+        for source in settings.approved_demand_sources
+        if source.status == "approved"
+    ]
+
+
+def _approved_vendors(settings: Settings):
+    return [vendor for vendor in settings.vendor_allowlist if vendor.status == "approved"]
 
 
 def _wallet_limits(wallet_type: str, settings: Settings) -> dict[str, Any]:
