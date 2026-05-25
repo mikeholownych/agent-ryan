@@ -1,0 +1,7 @@
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+ryan.sqlite3
+ryan.sqlite3-*
