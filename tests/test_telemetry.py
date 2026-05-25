@@ -53,6 +53,30 @@ def test_emit_action_event_appends_structured_audit_ledger_entry(sqlite_session)
     }
 
 
+def test_action_event_metadata_cannot_override_canonical_fields(sqlite_session):
+    from ryan.telemetry.service import emit_action_event
+
+    entry = emit_action_event(
+        sqlite_session,
+        domain="wallet",
+        event_name="freeze",
+        actor="operator",
+        reference_type="wallet",
+        reference_id="wallet-123",
+        metadata={
+            "telemetry_kind": "forged",
+            "domain": "payment",
+            "event_name": "confirmed",
+            "reason": "manual freeze",
+        },
+    )
+
+    assert entry.metadata_["telemetry_kind"] == "action"
+    assert entry.metadata_["domain"] == "wallet"
+    assert entry.metadata_["event_name"] == "freeze"
+    assert entry.metadata_["reason"] == "manual freeze"
+
+
 @pytest.mark.parametrize(
     ("alert_type", "reference_type", "reference_id", "metadata"),
     [
@@ -120,6 +144,32 @@ def test_emit_alert_appends_structured_alert_entries(
         "requires_operator_review": True,
         **metadata,
     }
+
+
+def test_alert_metadata_cannot_override_canonical_fields(sqlite_session):
+    from ryan.telemetry.service import emit_alert
+
+    entry = emit_alert(
+        sqlite_session,
+        alert_type="kill_switch_active",
+        severity="critical",
+        actor="system",
+        reference_type="kill_switch",
+        reference_id="kill-switch-123",
+        metadata={
+            "telemetry_kind": "action",
+            "alert_type": "budget_exhaustion",
+            "severity": "info",
+            "requires_operator_review": False,
+            "reason": "operator_stop",
+        },
+    )
+
+    assert entry.metadata_["telemetry_kind"] == "alert"
+    assert entry.metadata_["alert_type"] == "kill_switch_active"
+    assert entry.metadata_["severity"] == "critical"
+    assert entry.metadata_["requires_operator_review"] is True
+    assert entry.metadata_["reason"] == "operator_stop"
 
 
 @pytest.mark.parametrize(
