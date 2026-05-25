@@ -187,6 +187,23 @@ def test_kill_switch_guard_blocks_external_actions_while_active(
     assert "operator stop" in str(exc_info.value)
 
 
+def test_kill_switch_guard_fails_closed_when_any_duplicate_state_is_active(
+    sqlite_session,
+):
+    from ryan.kill_switch import KillSwitchActiveError, assert_external_action_allowed
+
+    inactive = KillSwitchState(active=False, reason="stale inactive row")
+    active = KillSwitchState(active=True, reason="operator stop")
+    sqlite_session.add_all([inactive, active])
+    sqlite_session.flush()
+
+    with pytest.raises(KillSwitchActiveError) as exc_info:
+        assert_external_action_allowed(sqlite_session, action_type="wallet_transfer")
+
+    assert exc_info.value.kill_switch_state_id == active.id
+    assert exc_info.value.reason == "operator stop"
+
+
 def test_kill_switch_guard_allows_external_actions_when_inactive(sqlite_session):
     from ryan.kill_switch import assert_external_action_allowed
 

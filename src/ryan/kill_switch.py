@@ -40,7 +40,11 @@ class KillSwitchActiveError(PermissionError):
 
 
 def get_kill_switch_state(session: Session) -> KillSwitchState:
-    state = session.scalar(select(KillSwitchState).limit(1))
+    state = session.scalar(
+        select(KillSwitchState)
+        .order_by(KillSwitchState.active.desc(), KillSwitchState.activated_at.desc())
+        .limit(1)
+    )
     if state is not None:
         return state
 
@@ -59,6 +63,8 @@ def activate_kill_switch(
 ) -> KillSwitchState:
     occurred_at = timestamp or datetime.now(UTC)
     state = get_kill_switch_state(session)
+    for existing_state in session.scalars(select(KillSwitchState)).all():
+        existing_state.active = False
     state.active = True
     state.reason = reason
     state.activated_by_actor = actor
@@ -87,10 +93,11 @@ def deactivate_kill_switch(
 ) -> KillSwitchState:
     occurred_at = timestamp or datetime.now(UTC)
     state = get_kill_switch_state(session)
-    state.active = False
-    state.reason = reason
-    state.deactivated_by_actor = actor
-    state.deactivated_at = occurred_at
+    for existing_state in session.scalars(select(KillSwitchState)).all():
+        existing_state.active = False
+        existing_state.reason = reason
+        existing_state.deactivated_by_actor = actor
+        existing_state.deactivated_at = occurred_at
     session.flush()
 
     emit_kill_switch_event(
