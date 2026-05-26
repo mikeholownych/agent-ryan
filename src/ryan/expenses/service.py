@@ -252,12 +252,12 @@ def _create_policy_exception(
 
 def _exception_type_for_rejection(decision: PolicyDecision) -> str:
     reason = decision.reason.lower()
+    if "kill switch" in reason:
+        return "kill_switch_blocked"
     if "minimum" in reason or "budget" in reason:
         return "budget_exhaustion"
     if "locked" in reason or "frozen" in reason:
         return "frozen_spend"
-    if "kill switch" in reason:
-        return "kill_switch_blocked"
     return "policy_rejection"
 
 

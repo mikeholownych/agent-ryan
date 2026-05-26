@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+from ryan.agent.router import router as agent_router
 from ryan.config import Settings, get_settings
 from ryan.operator.router import router as operator_router
 from ryan.payments.router import router as payment_router
@@ -21,6 +22,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(payment_router)
     app.include_router(report_router)
     app.include_router(operator_router)
+    app.include_router(agent_router)
 
     return app
 
