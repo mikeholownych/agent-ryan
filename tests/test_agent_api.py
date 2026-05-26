@@ -242,3 +242,21 @@ def test_status_api_returns_agent_console_state(tmp_path):
     assert payload["wallet_budget_state"]["operating"]["balance"] == "100.00"
     assert payload["kill_switch"]["active"] is False
     session.close()
+
+
+def test_agent_console_api_returns_required_display_state(tmp_path):
+    client, session = _client_with_session(tmp_path)
+    _seed_agent_state(session)
+
+    response = client.get("/api/agent/console")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["current_objective"] == "Sell the approved MVP offer"
+    assert payload["approved_offer_set"][0]["id"] == "offer-active"
+    assert payload["allowed_spend"]["currency"] == "USD"
+    assert payload["allowed_spend"]["available"] == "95.00"
+    assert payload["budget_state"]["operating"]["balance"] == "100.00"
+    assert payload["pending_tasks"] == []
+    assert payload["kill_switch"]["active"] is False
+    session.close()

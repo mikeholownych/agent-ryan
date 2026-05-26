@@ -155,12 +155,42 @@ def get_status(session: Session = Depends(get_session)) -> dict[str, Any]:
     }
 
 
+@router.get("/api/agent/console")
+def get_agent_console(session: Session = Depends(get_session)) -> dict[str, Any]:
+    status_payload = get_status(session)
+    operating_wallet = session.scalar(
+        select(Wallet).where(Wallet.type == "operating").limit(1)
+    )
+    return {
+        "current_objective": status_payload["current_objective"],
+        "approved_offer_set": status_payload["active_offers"],
+        "pending_tasks": status_payload["pending_tasks"],
+        "allowed_spend": _allowed_spend_payload(operating_wallet),
+        "recent_outcomes": status_payload["recent_outcomes"],
+        "budget_state": status_payload["wallet_budget_state"],
+        "kill_switch": status_payload["kill_switch"],
+    }
+
+
 def _expense_outcome(expense: ExpenseRequest) -> str:
     if expense.execution_status == "executed":
         return "executed"
     if expense.execution_status == "pending_review":
         return "pending_review"
     return "blocked"
+
+
+def _allowed_spend_payload(wallet: Wallet | None) -> dict[str, Any]:
+    if wallet is None:
+        return {"available": "0.00", "currency": None}
+    minimum = Decimal(str(wallet.limits.get("minimum", "0.00")))
+    available = wallet.balance - minimum
+    if available < Decimal("0.00"):
+        available = Decimal("0.00")
+    return {
+        "available": str(available),
+        "currency": wallet.currency,
+    }
 
 
 def _pending_tasks(session: Session) -> list[dict[str, Any]]:
