@@ -86,6 +86,33 @@ Production readiness requires:
 - operator and agent API keys,
 - production-ready business model.
 
+## Live Production Gate
+
+Ryan must not be declared operational in production only because the codebase
+passes readiness checks in a local or sandbox environment. Production completion
+requires operator-side provisioning and live validation of every external
+dependency:
+
+- real Stripe credentials and webhook endpoint configured for the production
+  account,
+- production operator and agent API keys stored outside the repository,
+- AWS Secrets Manager entries created and readable by the runtime identity,
+- external transactional database provisioned, migrated, and reachable,
+- container hosting or AWS ECS environment provisioned with the required
+  environment and secret injection,
+- production spend limits, category budgets, reserve minimum, and revenue
+  allocation policy explicitly configured,
+- `/api/production/readiness` returns `ready=true` from the deployed production
+  URL using operator credentials,
+- authenticated operator and agent access paths are verified against the
+  deployed service,
+- unauthenticated production requests are rejected except `/health`,
+- a live payment flow is validated through the selected Stripe mode before Ryan
+  handles real customer traffic.
+
+If any external dependency is missing, invalid, or unreachable, Ryan remains
+production-ready in code only and must not be treated as live production.
+
 ## Stripe Notes
 
 The Stripe provider creates Checkout Sessions with:

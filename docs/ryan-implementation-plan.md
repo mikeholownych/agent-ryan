@@ -1420,6 +1420,20 @@ Ryan MVP is done when:
 - Sandbox payment flow has been validated before production payment credentials are used.
 - Risks and open questions are either resolved or explicitly accepted by the operator for a limited pilot.
 
+Ryan production deployment is done only when:
+
+- Production readiness is implemented in code and verified by automated checks.
+- Real Stripe credentials, webhook secret, success URL, and cancel URL are provisioned outside the repository.
+- Production operator and agent API keys are provisioned through the selected secret system.
+- AWS Secrets Manager entries exist and are readable by the deployed runtime identity.
+- External transactional database infrastructure is provisioned, migrated, reachable, and not SQLite.
+- Hosting is provisioned as a container runtime or AWS ECS environment with required secret injection.
+- Final production spend limits, category budgets, reserve minimum, and revenue allocation policy are explicitly configured.
+- `/api/production/readiness` returns `ready=true` from the live production URL using operator credentials.
+- Production authentication and authorization are verified end to end for operator, agent, unauthenticated, and public health-check paths.
+- The selected Stripe production mode has been validated end to end before Ryan handles real customer traffic.
+- Live production deployment is operational, secured, and verified end to end.
+
 ## 16. Task Checklist
 
 1. Establish project scaffold.
