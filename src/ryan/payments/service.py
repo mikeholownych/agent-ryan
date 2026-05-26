@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -9,7 +10,7 @@ from sqlalchemy.orm import Session
 from ryan.catalog import OfferNotUsableError, validate_offer_for_payment_creation
 from ryan.idempotency import IdempotencyResponseReference, run_idempotent
 from ryan.ledger import append_ledger_entry
-from ryan.models import CheckoutSession, LedgerEntry, Payment, PolicyRule, Wallet
+from ryan.models import CheckoutSession, LedgerEntry, Payment, PolicyDecision, PolicyRule, Wallet
 from ryan.payments.provider import (
     ProviderCheckoutRequest,
     ProviderConfirmationRequest,
@@ -20,6 +21,7 @@ from ryan.wallets import allocate_settled_revenue
 
 PAYMENT_CREATE_IDEMPOTENCY_SCOPE = "payment_create"
 PAYMENT_CONFIRM_IDEMPOTENCY_SCOPE = "payment_confirm"
+PAYMENT_REFUND_IDEMPOTENCY_SCOPE = "payment_refund"
 
 
 class PaymentRequestError(ValueError):
@@ -28,6 +30,14 @@ class PaymentRequestError(ValueError):
 
 class PaymentConfirmationError(ValueError):
     """Raised when provider confirmation cannot be trusted."""
+
+
+class PaymentRefundError(ValueError):
+    """Raised when a refund cannot be created safely."""
+
+
+class PaymentRefundPolicyError(PermissionError):
+    """Raised when a refund is not covered by an approval decision."""
 
 
 def create_payment_request(
@@ -138,6 +148,47 @@ def settle_revenue_for_payment(
         allocation_rule_reference="active-revenue-allocation-policy",
         idempotency_key=f"revenue-allocation:{idempotency_key}",
     )
+
+
+def create_refund(
+    session: Session,
+    *,
+    payment_id: str,
+    amount: Decimal,
+    currency: str,
+    actor: str,
+    reason: str,
+    policy_decision_id: str,
+    idempotency_key: str,
+) -> Payment:
+    payload = {
+        "payment_id": payment_id,
+        "amount": str(amount),
+        "currency": currency,
+        "actor": actor,
+        "reason": reason,
+        "policy_decision_id": policy_decision_id,
+    }
+    response = run_idempotent(
+        session,
+        scope=PAYMENT_REFUND_IDEMPOTENCY_SCOPE,
+        key=idempotency_key,
+        request_payload=payload,
+        operation=lambda: _create_refund_once(
+            session,
+            payment_id=payment_id,
+            amount=amount,
+            currency=currency,
+            actor=actor,
+            reason=reason,
+            policy_decision_id=policy_decision_id,
+            idempotency_key=idempotency_key,
+        ),
+    )
+    refund = session.get(Payment, response.response_reference_id)
+    if refund is None:
+        raise PaymentRefundError("idempotent refund reference is missing")
+    return refund
 
 
 def _create_payment_request_once(
@@ -298,6 +349,81 @@ def _confirm_payment_once(
     )
 
 
+def _create_refund_once(
+    session: Session,
+    *,
+    payment_id: str,
+    amount: Decimal,
+    currency: str,
+    actor: str,
+    reason: str,
+    policy_decision_id: str,
+    idempotency_key: str,
+) -> IdempotencyResponseReference:
+    original_payment = session.get(Payment, payment_id)
+    if original_payment is None or original_payment.status != "settled":
+        raise PaymentRefundError("refund requires a settled payment")
+    if original_payment.currency != currency:
+        raise PaymentRefundError("refund currency must match original payment")
+    if not amount.is_finite() or amount <= Decimal("0") or amount > original_payment.amount:
+        raise PaymentRefundError("refund amount must be positive and within payment amount")
+    _assert_approved_refund_policy(
+        session,
+        policy_decision_id=policy_decision_id,
+        payment_id=payment_id,
+    )
+
+    refund = Payment(
+        checkout_session_id=original_payment.checkout_session_id,
+        invoice_id=original_payment.invoice_id,
+        amount=-amount,
+        currency=currency,
+        status="refunded",
+        source="refund",
+        payment_provider="simulated",
+        provider_reference=f"simulated-refund-{uuid4()}",
+        settlement_time=datetime.now(UTC),
+        idempotency_key=idempotency_key,
+    )
+    session.add(refund)
+    session.flush()
+    append_ledger_entry(
+        session,
+        type="audit.payment.refunded",
+        amount=refund.amount,
+        currency=refund.currency,
+        reference_type="payment",
+        reference_id=refund.id,
+        actor=actor,
+        metadata={
+            "original_payment_id": original_payment.id,
+            "reason": reason,
+            "policy_decision_id": policy_decision_id,
+        },
+    )
+    return IdempotencyResponseReference(
+        response_reference_type="payment",
+        response_reference_id=refund.id,
+    )
+
+
+def _assert_approved_refund_policy(
+    session: Session,
+    *,
+    policy_decision_id: str,
+    payment_id: str,
+) -> None:
+    decision = session.get(PolicyDecision, policy_decision_id)
+    if (
+        decision is None
+        or decision.action_type != "refund"
+        or decision.decision != "approve"
+        or decision.request_reference_type != "payment"
+        or decision.request_reference_id != payment_id
+    ):
+        raise PaymentRefundPolicyError("refund requires an approved policy decision")
+
+
 def _payment_by_provider_event(
     session: Session,
     provider_event_id: str,
@@ -427,9 +553,13 @@ def _allocation_amounts_for_payment(
 __all__ = [
     "PAYMENT_CREATE_IDEMPOTENCY_SCOPE",
     "PAYMENT_CONFIRM_IDEMPOTENCY_SCOPE",
+    "PAYMENT_REFUND_IDEMPOTENCY_SCOPE",
     "PaymentConfirmationError",
+    "PaymentRefundError",
+    "PaymentRefundPolicyError",
     "PaymentRequestError",
     "confirm_payment",
+    "create_refund",
     "create_payment_request",
     "settle_revenue_for_payment",
 ]

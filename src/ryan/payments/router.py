@@ -12,8 +12,11 @@ from ryan.db import get_session
 from ryan.models import CheckoutSession, Payment
 from ryan.payments.service import (
     PaymentConfirmationError,
+    PaymentRefundError,
+    PaymentRefundPolicyError,
     PaymentRequestError,
     confirm_payment,
+    create_refund,
     create_payment_request,
     settle_revenue_for_payment,
 )
@@ -50,6 +53,16 @@ class PaymentConfirmRequest(BaseModel):
     status: Literal["confirmed", "settled"]
     verification_token: str
     actor: str
+    idempotency_key: str
+
+
+class PaymentRefundRequest(BaseModel):
+    payment_id: str
+    amount: Decimal
+    currency: str
+    actor: str
+    reason: str
+    policy_decision_id: str
     idempotency_key: str
 
 
@@ -126,6 +139,35 @@ def post_payment_confirm(
     session.commit()
     session.refresh(payment)
     return payment
+
+
+@router.post(
+    "/refund",
+    response_model=PaymentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def post_payment_refund(
+    payload: PaymentRefundRequest,
+    session: Session = Depends(get_session),
+):
+    try:
+        refund = create_refund(
+            session,
+            payment_id=payload.payment_id,
+            amount=payload.amount,
+            currency=payload.currency,
+            actor=payload.actor,
+            reason=payload.reason,
+            policy_decision_id=payload.policy_decision_id,
+            idempotency_key=payload.idempotency_key,
+        )
+    except PaymentRefundPolicyError as error:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(error))
+    except PaymentRefundError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+    session.commit()
+    session.refresh(refund)
+    return refund
 
 
 @router.get("/{payment_id}", response_model=PaymentLookupResponse)

@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from ryan.app import create_app
 from ryan.db import Base, create_database_engine, get_session
-from ryan.models import BucketAllocation, Offer, Payment, PolicyRule, Wallet
+from ryan.models import BucketAllocation, Offer, Payment, PolicyDecision, PolicyRule, Wallet
 
 
 def _client_with_session(tmp_path):
@@ -193,4 +193,104 @@ def test_payments_api_invalid_confirmation_does_not_allocate(tmp_path):
     assert session.get(Wallet, wallets["operating"].id).balance == Decimal("0.00")
     assert session.get(Wallet, wallets["reserve"].id).balance == Decimal("0.00")
     assert session.scalar(select(Payment)) is None
+    session.close()
+
+
+def test_payments_api_refund_requires_approved_policy_decision(tmp_path):
+    client, session = _client_with_session(tmp_path)
+    _create_offer(session)
+    _create_wallets_and_allocation_policy(session)
+    checkout = _create_checkout(client)
+    confirm_response = client.post(
+        "/api/payments/confirm",
+        json={
+            "checkout_provider_reference": checkout["provider_reference"],
+            "provider_event_id": "provider-event-api-001",
+            "amount": "100.00",
+            "currency": "USD",
+            "status": "settled",
+            "verification_token": "simulated-valid",
+            "actor": "system:webhook",
+            "idempotency_key": "payment-confirm-api-001",
+        },
+    )
+    payment_id = confirm_response.json()["id"]
+
+    response = client.post(
+        "/api/payments/refund",
+        json={
+            "payment_id": payment_id,
+            "amount": "10.00",
+            "currency": "USD",
+            "actor": "operator:test",
+            "reason": "customer requested refund",
+            "policy_decision_id": "missing-policy-decision",
+            "idempotency_key": "refund-api-missing-policy",
+        },
+    )
+
+    assert response.status_code == 403
+    assert (
+        session.scalar(
+            select(func.count(Payment.id)).where(Payment.source == "refund")
+        )
+        == 0
+    )
+    session.close()
+
+
+def test_payments_api_creates_policy_approved_refund_idempotently(tmp_path):
+    client, session = _client_with_session(tmp_path)
+    _create_offer(session)
+    _create_wallets_and_allocation_policy(session)
+    checkout = _create_checkout(client)
+    confirm_response = client.post(
+        "/api/payments/confirm",
+        json={
+            "checkout_provider_reference": checkout["provider_reference"],
+            "provider_event_id": "provider-event-api-001",
+            "amount": "100.00",
+            "currency": "USD",
+            "status": "settled",
+            "verification_token": "simulated-valid",
+            "actor": "system:webhook",
+            "idempotency_key": "payment-confirm-api-001",
+        },
+    )
+    payment_id = confirm_response.json()["id"]
+    decision = PolicyDecision(
+        action_type="refund",
+        decision="approve",
+        reason="operator approved refund",
+        rule_results={"operator_review": {"decision": "approve"}},
+        request_reference_type="payment",
+        request_reference_id=payment_id,
+        actor="operator:test",
+    )
+    session.add(decision)
+    session.commit()
+    payload = {
+        "payment_id": payment_id,
+        "amount": "10.00",
+        "currency": "USD",
+        "actor": "operator:test",
+        "reason": "customer requested refund",
+        "policy_decision_id": decision.id,
+        "idempotency_key": "refund-api-approved",
+    }
+
+    response = client.post("/api/payments/refund", json=payload)
+    replay_response = client.post("/api/payments/refund", json=payload)
+
+    assert response.status_code == 201
+    assert replay_response.status_code == 201
+    assert replay_response.json()["id"] == response.json()["id"]
+    assert response.json()["status"] == "refunded"
+    assert response.json()["amount"] == "-10.00"
+    assert (
+        session.scalar(
+            select(func.count(Payment.id)).where(Payment.source == "refund")
+        )
+        == 1
+    )
     session.close()
