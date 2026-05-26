@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from ryan.config import Settings, get_settings
 from ryan.policy.router import router as policy_router
+from ryan.wallets.router import router as wallet_router
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -13,6 +14,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {"status": "ok", "service": resolved_settings.service_name}
 
     app.include_router(policy_router)
+    app.include_router(wallet_router)
 
     return app
 
