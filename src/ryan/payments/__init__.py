@@ -6,6 +6,7 @@ from ryan.payments.service import (
     PaymentRequestError,
     confirm_payment,
     create_payment_request,
+    settle_revenue_for_payment,
 )
 
 __all__ = [
@@ -13,4 +14,5 @@ __all__ = [
     "PaymentRequestError",
     "confirm_payment",
     "create_payment_request",
+    "settle_revenue_for_payment",
 ]

@@ -9,13 +9,14 @@ from sqlalchemy.orm import Session
 from ryan.catalog import OfferNotUsableError, validate_offer_for_payment_creation
 from ryan.idempotency import IdempotencyResponseReference, run_idempotent
 from ryan.ledger import append_ledger_entry
-from ryan.models import CheckoutSession, Payment
+from ryan.models import CheckoutSession, LedgerEntry, Payment, PolicyRule, Wallet
 from ryan.payments.provider import (
     ProviderCheckoutRequest,
     ProviderConfirmationRequest,
     SimulatedPaymentProvider,
 )
 from ryan.telemetry import emit_alert
+from ryan.wallets import allocate_settled_revenue
 
 PAYMENT_CREATE_IDEMPOTENCY_SCOPE = "payment_create"
 PAYMENT_CONFIRM_IDEMPOTENCY_SCOPE = "payment_confirm"
@@ -102,6 +103,41 @@ def confirm_payment(
     if payment is None:
         raise PaymentConfirmationError("idempotent payment reference is missing")
     return payment
+
+
+def settle_revenue_for_payment(
+    session: Session,
+    *,
+    payment: Payment,
+    actor: str,
+    idempotency_key: str,
+) -> None:
+    if payment.status != "settled":
+        return
+    revenue_wallet = _wallet_by_type_and_currency(
+        session,
+        wallet_type="revenue",
+        currency=payment.currency,
+    )
+    if revenue_wallet is None:
+        raise PaymentConfirmationError("settlement requires a revenue wallet")
+    _credit_revenue_wallet_for_settlement(
+        session,
+        payment=payment,
+        revenue_wallet=revenue_wallet,
+        actor=actor,
+        idempotency_key=idempotency_key,
+    )
+    allocate_settled_revenue(
+        session,
+        payment_id=payment.id,
+        source_wallet_id=revenue_wallet.id,
+        allocations=_allocation_amounts_for_payment(session, payment),
+        currency=payment.currency,
+        actor=actor,
+        allocation_rule_reference="active-revenue-allocation-policy",
+        idempotency_key=f"revenue-allocation:{idempotency_key}",
+    )
 
 
 def _create_payment_request_once(
@@ -314,6 +350,80 @@ def _record_invalid_confirmation_alert(
     )
 
 
+def _wallet_by_type_and_currency(
+    session: Session,
+    *,
+    wallet_type: str,
+    currency: str,
+) -> Wallet | None:
+    return session.scalar(
+        select(Wallet).where(Wallet.type == wallet_type, Wallet.currency == currency)
+    )
+
+
+def _credit_revenue_wallet_for_settlement(
+    session: Session,
+    *,
+    payment: Payment,
+    revenue_wallet: Wallet,
+    actor: str,
+    idempotency_key: str,
+) -> None:
+    existing_entry = session.scalar(
+        select(LedgerEntry).where(
+            LedgerEntry.type == "wallet.settlement.credit",
+            LedgerEntry.reference_type == "payment",
+            LedgerEntry.reference_id == payment.id,
+            LedgerEntry.metadata_["idempotency_key"].as_string() == idempotency_key,
+        )
+    )
+    if existing_entry is not None:
+        return
+    revenue_wallet.balance += payment.amount
+    session.flush()
+    append_ledger_entry(
+        session,
+        type="wallet.settlement.credit",
+        amount=payment.amount,
+        currency=payment.currency,
+        reference_type="payment",
+        reference_id=payment.id,
+        actor=actor,
+        metadata={
+            "wallet_id": revenue_wallet.id,
+            "idempotency_key": idempotency_key,
+        },
+    )
+
+
+def _allocation_amounts_for_payment(
+    session: Session,
+    payment: Payment,
+) -> dict[str, Decimal]:
+    rule = session.scalar(
+        select(PolicyRule)
+        .where(PolicyRule.type == "revenue_allocation", PolicyRule.status == "active")
+        .order_by(PolicyRule.priority.asc(), PolicyRule.created_at.asc())
+    )
+    if rule is None:
+        raise PaymentConfirmationError("settlement requires revenue allocation policy")
+
+    percentages = rule.configuration.get("wallet_percentages") or {}
+    required_wallets = {"revenue", "operating", "reserve"}
+    if set(percentages) != required_wallets:
+        raise PaymentConfirmationError("revenue allocation policy must cover MVP wallets")
+
+    amounts: dict[str, Decimal] = {}
+    remaining = payment.amount
+    for wallet_type in ["operating", "reserve"]:
+        amount = (payment.amount * Decimal(str(percentages[wallet_type])) / Decimal("100"))
+        amount = amount.quantize(Decimal("0.01"))
+        amounts[wallet_type] = amount
+        remaining -= amount
+    amounts["revenue"] = remaining
+    return amounts
+
+
 __all__ = [
     "PAYMENT_CREATE_IDEMPOTENCY_SCOPE",
     "PAYMENT_CONFIRM_IDEMPOTENCY_SCOPE",
@@ -321,4 +431,5 @@ __all__ = [
     "PaymentRequestError",
     "confirm_payment",
     "create_payment_request",
+    "settle_revenue_for_payment",
 ]

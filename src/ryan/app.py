@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from ryan.config import Settings, get_settings
+from ryan.payments.router import router as payment_router
 from ryan.policy.router import router as policy_router
 from ryan.wallets.router import router as wallet_router
 
@@ -15,6 +16,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(policy_router)
     app.include_router(wallet_router)
+    app.include_router(payment_router)
 
     return app
 
