@@ -348,6 +348,44 @@ def test_malformed_time_window_range_rejects_fail_closed(sqlite_session):
     assert "time window rule has invalid hour range" in decision.reason
 
 
+@pytest.mark.parametrize(
+    "window",
+    [
+        {
+            "name": "bool-hour-window",
+            "start_hour_utc": True,
+            "end_hour_utc": 17,
+            "days": ["mon"],
+            "timezone": "UTC",
+        },
+        {
+            "name": "string-days-window",
+            "start_hour_utc": 9,
+            "end_hour_utc": 17,
+            "days": "mon",
+            "timezone": "UTC",
+        },
+    ],
+)
+def test_malformed_time_window_types_reject_fail_closed(sqlite_session, window):
+    _create_wallets(sqlite_session)
+    _create_required_rules(sqlite_session)
+    time_window_rule = sqlite_session.scalar(
+        select(PolicyRule).where(PolicyRule.type == "time_window")
+    )
+    time_window_rule.configuration = {"windows": [window]}
+    sqlite_session.flush()
+
+    decision = evaluate_policy(
+        sqlite_session,
+        request=_expense_request(reference_id=f"expense-{window['name']}"),
+        timestamp=_monday_noon(),
+    )
+
+    assert decision.decision == "reject"
+    assert "time window rule has invalid" in decision.reason
+
+
 def test_uncertain_spend_threshold_config_rejects_fail_closed(sqlite_session):
     _create_wallets(sqlite_session)
     _create_required_rules(

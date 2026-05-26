@@ -604,9 +604,10 @@ def _evaluate_time_window(
     for window in rule.configuration.get("windows") or []:
         start_hour = window.get("start_hour_utc")
         end_hour = window.get("end_hour_utc")
+        days = window.get("days")
         if (
-            not isinstance(start_hour, int)
-            or not isinstance(end_hour, int)
+            type(start_hour) is not int
+            or type(end_hour) is not int
             or start_hour < 0
             or start_hour > 23
             or end_hour < 1
@@ -619,8 +620,17 @@ def _evaluate_time_window(
                 "reason": "time window rule has invalid hour range",
                 "window": window.get("name"),
             }
+        if not isinstance(days, list) or not all(
+            isinstance(day_name, str) for day_name in days
+        ):
+            return {
+                "passed": False,
+                "decision": "reject",
+                "reason": "time window rule has invalid days",
+                "window": window.get("name"),
+            }
         if (
-            day in (window.get("days") or [])
+            day in days
             and start_hour <= occurred_at.hour < end_hour
         ):
             return {
