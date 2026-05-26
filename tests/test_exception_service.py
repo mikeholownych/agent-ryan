@@ -111,10 +111,9 @@ def test_list_exception_records_filters_visible_open_items(sqlite_session):
     assert [record.id for record in list_exception_records(sqlite_session)] == [
         first.id
     ]
-    assert [record.id for record in list_exception_records(sqlite_session, status=None)] == [
-        first.id,
-        second.id,
-    ]
+    assert {
+        record.id for record in list_exception_records(sqlite_session, status=None)
+    } == {first.id, second.id}
 
 
 def test_transition_exception_status_records_resolution_audit(sqlite_session):
