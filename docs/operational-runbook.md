@@ -2,9 +2,15 @@
 
 ## Scope
 
-This runbook covers the sandbox MVP implementation of Ryan. Ryan remains a modular monolith with policy-gated money movement, append-only ledger entries, idempotent money-flow operations, first-class revenue, operating, and reserve wallets, wallet freeze controls, and a global kill switch.
+This runbook covers Ryan sandbox operation, production readiness operation, and
+post-deployment operating tasks. Ryan remains a modular monolith with
+policy-gated money movement, append-only ledger entries, idempotent money-flow
+operations, first-class revenue, operating, and reserve wallets, wallet freeze
+controls, and a global kill switch.
 
-Production launch is still blocked until the unresolved launch decisions in `docs/ryan-implementation-plan.md` are closed, including the initial niche, production payment rail, credential storage, production identity model, and final autonomous spend limits.
+Production launch is governed by `docs/production-deployment.md` and remains
+blocked until the live production gate is satisfied from the deployed production
+URL with real external dependencies provisioned and verified.
 
 ## Kill Switch
 
@@ -122,12 +128,60 @@ Reconciliation steps:
 
 ## Credential Rotation
 
-Production credential rotation is deferred until the production payment rail and secret store are selected.
+Production credential rotation must use the configured production secret store.
 
-Before production:
+Required rotation controls:
 
-- choose the payment provider,
-- choose the secret-management system,
-- document provider webhook secret rotation,
-- document API key rotation,
-- add a production incident step for disabling provider credentials while keeping Ryan read-only.
+- rotate Stripe API keys and webhook secrets through AWS Secrets Manager,
+- rotate operator and agent API keys through AWS Secrets Manager,
+- restart or redeploy the service after rotation if runtime secret reload is not
+  implemented,
+- validate `/api/production/readiness` after rotation,
+- keep Ryan read-only with the kill switch active if provider credentials are
+  suspected to be compromised.
+
+## First Post-Deployment Operating Task
+
+After production deployment is complete and the live production gate in
+`docs/production-deployment.md` is satisfied, Ryan's first operating task is to
+establish and run the WordPress blog at `agentryan.blog`.
+
+Purpose:
+
+- document Ryan's process, implementation details, and lessons learned,
+- publish sanitized public knowledge only,
+- keep the blog outside Ryan's money movement, credential, customer-data, and
+  operational-control boundaries.
+
+Publication workflow:
+
+1. Draft the post in WordPress or a controlled editorial draft location.
+2. Review the draft for accuracy, policy compliance, and operator approval.
+3. Sanitize the draft for sensitive data.
+4. Verify that the final content contains no sensitive data or unsafe
+   operational detail.
+5. Publish only after review, sanitization, and verification all pass.
+
+Publication must be blocked if any sensitive data remains, including:
+
+- secrets,
+- credentials,
+- API keys,
+- tokens,
+- internal URLs,
+- private IPs,
+- customer data,
+- wallet data,
+- raw logs,
+- deployment artifacts,
+- operational details that could expose Ryan or its users.
+
+WordPress operating safeguards:
+
+- apply WordPress hardening from the start,
+- keep WordPress core, themes, and plugins updated,
+- use least-privilege WordPress accounts,
+- require strong authentication controls for publishing accounts,
+- require reviewer approval before publishing,
+- treat `agentryan.blog` as a public documentation surface, not an internal
+  notes, logs, deployment-artifact, or incident-record store.

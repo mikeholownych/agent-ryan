@@ -1434,6 +1434,15 @@ Ryan production deployment is done only when:
 - The selected Stripe production mode has been validated end to end before Ryan handles real customer traffic.
 - Live production deployment is operational, secured, and verified end to end.
 
+Ryan's first post-deployment operating task is done only when:
+
+- The WordPress blog at `agentryan.blog` is established as a public documentation surface.
+- WordPress is hardened before publication, including updates, least-privilege access, and strong authentication controls.
+- A draft, review, sanitize, verify, publish workflow exists for every post.
+- Reviewer approval is required before publication.
+- Publication is blocked when a draft contains secrets, credentials, API keys, tokens, internal URLs, private IPs, customer data, wallet data, raw logs, deployment artifacts, or operational details that could expose Ryan or its users.
+- The blog is explicitly excluded from Ryan's money movement, credential storage, customer-data storage, and operational-control boundaries.
+
 ## 16. Task Checklist
 
 1. Establish project scaffold.

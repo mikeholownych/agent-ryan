@@ -113,6 +113,27 @@ dependency:
 If any external dependency is missing, invalid, or unreachable, Ryan remains
 production-ready in code only and must not be treated as live production.
 
+## First Post-Deployment Task
+
+After the live production gate is satisfied, Ryan's first operating task is to
+establish and run the WordPress blog at `agentryan.blog` as a public
+documentation surface for process, implementation details, and lessons learned.
+
+The blog must not store or publish secrets, credentials, API keys, tokens,
+internal URLs, private IPs, customer data, wallet data, raw logs, deployment
+artifacts, or operational details that could expose Ryan or its users.
+
+Every post must follow the runbook workflow:
+
+1. Draft.
+2. Review.
+3. Sanitize.
+4. Verify.
+5. Publish.
+
+Publication must be blocked if sensitive data or unsafe operational detail
+remains.
+
 ## Stripe Notes
 
 The Stripe provider creates Checkout Sessions with:
