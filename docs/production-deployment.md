@@ -116,10 +116,11 @@ production-ready in code only and must not be treated as live production.
 ## First Post-Deployment Task
 
 After the live production gate is satisfied, Ryan's first operating task is to
-establish and run the WordPress blog at `agentryan.blog` as a public
-documentation surface for process, implementation details, and lessons learned.
+establish, configure, and run the WordPress blog at `agentryan.blog` as a
+public documentation surface for process, implementation details, and lessons
+learned. Ryan owns the post-deployment blog workflow after launch.
 
-The blog must not store or publish secrets, credentials, API keys, tokens,
+The blog must not store or publish secrets, credentials, tokens, API keys,
 internal URLs, private IPs, customer data, wallet data, raw logs, deployment
 artifacts, or operational details that could expose Ryan or its users.
 

@@ -144,7 +144,8 @@ Required rotation controls:
 
 After production deployment is complete and the live production gate in
 `docs/production-deployment.md` is satisfied, Ryan's first operating task is to
-establish and run the WordPress blog at `agentryan.blog`.
+establish, configure, and run the WordPress blog at `agentryan.blog`. Ryan owns
+the post-deployment blog workflow after launch.
 
 Purpose:
 
@@ -162,17 +163,18 @@ Publication workflow:
    operational detail.
 5. Publish only after review, sanitization, and verification all pass.
 
-Publication must be blocked if any sensitive data remains, including:
+Publication must be blocked if any sensitive data remains. Ryan must never
+publish:
 
 - secrets,
 - credentials,
-- API keys,
 - tokens,
+- API keys,
 - internal URLs,
 - private IPs,
 - customer data,
 - wallet data,
-- raw logs,
+- logs,
 - deployment artifacts,
 - operational details that could expose Ryan or its users.
 

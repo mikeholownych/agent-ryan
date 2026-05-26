@@ -1436,11 +1436,12 @@ Ryan production deployment is done only when:
 
 Ryan's first post-deployment operating task is done only when:
 
-- The WordPress blog at `agentryan.blog` is established as a public documentation surface.
+- Ryan owns the post-deployment blog workflow after launch.
+- The WordPress blog at `agentryan.blog` is established, configured, and operating as a public documentation surface.
 - WordPress is hardened before publication, including updates, least-privilege access, and strong authentication controls.
 - A draft, review, sanitize, verify, publish workflow exists for every post.
 - Reviewer approval is required before publication.
-- Publication is blocked when a draft contains secrets, credentials, API keys, tokens, internal URLs, private IPs, customer data, wallet data, raw logs, deployment artifacts, or operational details that could expose Ryan or its users.
+- Publication is blocked when a draft contains secrets, credentials, tokens, API keys, internal URLs, private IPs, customer data, wallet data, logs, deployment artifacts, or operational details that could expose Ryan or its users.
 - The blog is explicitly excluded from Ryan's money movement, credential storage, customer-data storage, and operational-control boundaries.
 
 ## 16. Task Checklist
