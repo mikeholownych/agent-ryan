@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from ryan.db import Base, create_database_engine
 from ryan.models import CheckoutSession, LedgerEntry, Offer, Payment
+from ryan.payments.provider import ProviderCheckoutResult
 from ryan.payments.service import (
     PaymentConfirmationError,
     PaymentRequestError,
@@ -46,6 +47,21 @@ def _create_offers(session):
     session.add_all([active, inactive])
     session.flush()
     return active, inactive
+
+
+class FakeCheckoutProvider:
+    name = "fake"
+
+    def __init__(self):
+        self.requests = []
+
+    def create_checkout(self, request):
+        self.requests.append(request)
+        return ProviderCheckoutResult(
+            provider_name=self.name,
+            provider_reference="fake-checkout-001",
+            checkout_url="https://checkout.example/fake-checkout-001",
+        )
 
 
 def test_create_payment_request_for_active_offer_creates_checkout_session(
@@ -133,6 +149,25 @@ def test_create_payment_request_rejects_disallowed_channel(sqlite_session):
         )
 
     assert sqlite_session.scalar(select(CheckoutSession)) is None
+
+
+def test_create_payment_request_accepts_injected_production_provider(sqlite_session):
+    active, _ = _create_offers(sqlite_session)
+    provider = FakeCheckoutProvider()
+
+    checkout_session = create_payment_request(
+        sqlite_session,
+        offer_id=active.id,
+        channel="checkout",
+        actor="agent:ryan",
+        idempotency_key="payment-create-provider",
+        provider=provider,
+    )
+
+    assert checkout_session.payment_provider == "fake"
+    assert checkout_session.provider_reference == "fake-checkout-001"
+    assert provider.requests[0].offer_name == "MVP Support Sprint"
+    assert provider.requests[0].idempotency_key == "payment-create-provider"
 
 
 def test_confirm_payment_verifies_provider_event_and_persists_payment(

@@ -13,8 +13,8 @@ from ryan.ledger import append_ledger_entry
 from ryan.models import CheckoutSession, LedgerEntry, Payment, PolicyDecision, PolicyRule, Wallet
 from ryan.payments.provider import (
     ProviderCheckoutRequest,
-    ProviderConfirmationRequest,
     SimulatedPaymentProvider,
+    ProviderConfirmationRequest,
 )
 from ryan.telemetry import emit_alert
 from ryan.wallets import allocate_settled_revenue
@@ -47,6 +47,7 @@ def create_payment_request(
     channel: str,
     actor: str,
     idempotency_key: str,
+    provider=None,
 ) -> CheckoutSession:
     payload = {
         "offer_id": offer_id,
@@ -64,6 +65,7 @@ def create_payment_request(
             channel=channel,
             actor=actor,
             idempotency_key=idempotency_key,
+            provider=provider,
         ),
     )
     checkout_session = session.get(CheckoutSession, response.response_reference_id)
@@ -198,6 +200,7 @@ def _create_payment_request_once(
     channel: str,
     actor: str,
     idempotency_key: str,
+    provider=None,
 ) -> IdempotencyResponseReference:
     try:
         offer = validate_offer_for_payment_creation(
@@ -208,13 +211,15 @@ def _create_payment_request_once(
     except OfferNotUsableError as error:
         raise PaymentRequestError(str(error)) from error
 
-    provider = SimulatedPaymentProvider()
-    provider_result = provider.create_checkout(
+    checkout_provider = provider or SimulatedPaymentProvider()
+    provider_result = checkout_provider.create_checkout(
         ProviderCheckoutRequest(
             offer_id=offer.id,
             amount=offer.price,
             currency=offer.currency,
             channel=channel,
+            offer_name=offer.name,
+            idempotency_key=idempotency_key,
         )
     )
     checkout_session = CheckoutSession(

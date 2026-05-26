@@ -4,10 +4,12 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
+from ryan.config import Settings, get_settings
 from ryan.db import get_session
 from ryan.models import CheckoutSession, Payment
 from ryan.payments.service import (
@@ -20,6 +22,7 @@ from ryan.payments.service import (
     create_payment_request,
     settle_revenue_for_payment,
 )
+from ryan.payments.provider import SimulatedPaymentProvider, StripePaymentProvider
 
 router = APIRouter(prefix="/api/payments", tags=["payments"])
 
@@ -95,6 +98,7 @@ class PaymentLookupResponse(BaseModel):
 def post_payment_create(
     payload: PaymentCreateRequest,
     session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
 ):
     try:
         checkout_session = create_payment_request(
@@ -103,12 +107,33 @@ def post_payment_create(
             channel=payload.channel,
             actor=payload.actor,
             idempotency_key=payload.idempotency_key,
+            provider=_payment_provider_from_settings(settings),
         )
     except PaymentRequestError as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
     session.commit()
     session.refresh(checkout_session)
     return checkout_session
+
+
+def _payment_provider_from_settings(settings: Settings):
+    if settings.payment_rail == "stripe":
+        if (
+            settings.stripe_api_key is None
+            or settings.stripe_success_url is None
+            or settings.stripe_cancel_url is None
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Stripe payment rail is not fully configured",
+            )
+        return StripePaymentProvider(
+            api_key=settings.stripe_api_key,
+            success_url=settings.stripe_success_url,
+            cancel_url=settings.stripe_cancel_url,
+            http_client=httpx.Client(),
+        )
+    return SimulatedPaymentProvider()
 
 
 @router.post("/confirm", response_model=PaymentResponse)

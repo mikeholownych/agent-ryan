@@ -239,6 +239,8 @@ class Settings(BaseSettings):
     payment_rail: Literal["simulated", "stripe"] = "simulated"
     stripe_api_key: str | None = None
     stripe_webhook_secret: str | None = None
+    stripe_success_url: str | None = None
+    stripe_cancel_url: str | None = None
     secret_backend: Literal["environment", "aws_secrets_manager"] = "environment"
     hosting_environment: Literal["local", "container", "aws_ecs"] = "local"
 
@@ -267,8 +269,15 @@ class Settings(BaseSettings):
         if self.payment_rail != "stripe":
             raise ValueError("production payment rail must be stripe")
 
-        if not self.stripe_api_key or not self.stripe_webhook_secret:
-            raise ValueError("production requires Stripe API key and webhook secret")
+        if (
+            not self.stripe_api_key
+            or not self.stripe_webhook_secret
+            or not self.stripe_success_url
+            or not self.stripe_cancel_url
+        ):
+            raise ValueError(
+                "production requires Stripe API key, webhook secret, success URL, and cancel URL"
+            )
 
         if self.secret_backend == "environment":
             raise ValueError("production requires external secret_backend")

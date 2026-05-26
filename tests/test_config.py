@@ -153,6 +153,8 @@ def test_sandbox_can_use_defaults_while_production_requires_explicit_values():
         payment_rail="stripe",
         stripe_api_key="sk_live_test_value_for_validation",
         stripe_webhook_secret="whsec_test_value_for_validation",
+        stripe_success_url="https://example.com/success",
+        stripe_cancel_url="https://example.com/cancel",
         secret_backend="aws_secrets_manager",
         hosting_environment="container",
         _env_file=None,

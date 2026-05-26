@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Protocol
 from uuid import uuid4
+
+
+STRIPE_CHECKOUT_SESSIONS_URL = "https://api.stripe.com/v1/checkout/sessions"
 
 
 @dataclass(frozen=True)
@@ -11,6 +15,8 @@ class ProviderCheckoutRequest:
     amount: Decimal
     currency: str
     channel: str
+    offer_name: str | None = None
+    idempotency_key: str | None = None
 
 
 @dataclass(frozen=True)
@@ -65,10 +71,72 @@ class SimulatedPaymentProvider:
         )
 
 
+class StripeHttpClient(Protocol):
+    def post(self, url: str, *, data: dict[str, str], headers: dict[str, str], timeout: int):
+        ...
+
+
+class StripePaymentProvider:
+    name = "stripe"
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        success_url: str,
+        cancel_url: str,
+        http_client: StripeHttpClient,
+    ) -> None:
+        self.api_key = api_key
+        self.success_url = success_url
+        self.cancel_url = cancel_url
+        self.http_client = http_client
+
+    def create_checkout(
+        self,
+        request: ProviderCheckoutRequest,
+    ) -> ProviderCheckoutResult:
+        response = self.http_client.post(
+            STRIPE_CHECKOUT_SESSIONS_URL,
+            data={
+                "mode": "payment",
+                "success_url": self.success_url,
+                "cancel_url": self.cancel_url,
+                "line_items[0][price_data][currency]": request.currency.lower(),
+                "line_items[0][price_data][unit_amount]": str(
+                    _minor_units(request.amount)
+                ),
+                "line_items[0][price_data][product_data][name]": (
+                    request.offer_name or request.offer_id
+                ),
+                "line_items[0][quantity]": "1",
+                "metadata[offer_id]": request.offer_id,
+                "metadata[channel]": request.channel,
+            },
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Idempotency-Key": request.idempotency_key or str(uuid4()),
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        return ProviderCheckoutResult(
+            provider_name=self.name,
+            provider_reference=payload["id"],
+            checkout_url=payload["url"],
+        )
+
+
+def _minor_units(amount: Decimal) -> int:
+    return int((amount * Decimal("100")).quantize(Decimal("1")))
+
+
 __all__ = [
     "ProviderCheckoutRequest",
     "ProviderCheckoutResult",
     "ProviderConfirmationRequest",
     "ProviderConfirmationResult",
     "SimulatedPaymentProvider",
+    "StripePaymentProvider",
 ]
