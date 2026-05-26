@@ -151,6 +151,7 @@ def _execute_transfer(
         raise WalletTransferError("wallet transfer cannot involve a frozen wallet")
     if source_wallet.balance < amount:
         raise WalletTransferError("wallet transfer source has insufficient funds")
+    _assert_transfer_preserves_source_minimum(source_wallet, amount)
 
     transfer = WalletTransfer(
         source_wallet_id=source_wallet.id,
@@ -216,6 +217,26 @@ def _assert_approved_transfer_policy(
 def _assert_valid_transfer_amount(amount: Decimal) -> None:
     if not amount.is_finite() or amount <= Decimal("0"):
         raise WalletTransferError("wallet transfer amount must be positive and finite")
+
+
+def _assert_transfer_preserves_source_minimum(
+    source_wallet: Wallet,
+    amount: Decimal,
+) -> None:
+    minimum = _decimal_limit(source_wallet.limits.get("minimum"))
+    if minimum is None:
+        return
+    if source_wallet.balance - amount < minimum:
+        raise WalletTransferError("wallet transfer would violate source wallet minimum")
+
+
+def _decimal_limit(value: Any) -> Decimal | None:
+    if value is None:
+        return None
+    parsed = Decimal(str(value))
+    if not parsed.is_finite() or parsed < Decimal("0"):
+        raise WalletTransferError("wallet minimum limit is invalid")
+    return parsed
 
 
 def _append_transfer_ledger_entries(

@@ -240,6 +240,34 @@ def test_transfer_from_frozen_wallet_rejects_without_mutating(sqlite_session):
     assert sqlite_session.scalar(select(WalletTransfer)) is None
 
 
+def test_transfer_that_violates_operating_minimum_rejects_without_mutating(
+    sqlite_session,
+):
+    wallets = _create_wallets(sqlite_session)
+    wallets["operating"].limits = {"minimum": "45.00"}
+    decision = _approved_transfer_policy(
+        sqlite_session,
+        reference_id="wallet-transfer-budget-exhausted",
+    )
+
+    with pytest.raises(WalletTransferError):
+        transfer_between_wallets(
+            sqlite_session,
+            source_wallet_id=wallets["operating"].id,
+            destination_wallet_id=wallets["reserve"].id,
+            amount=Decimal("10.00"),
+            currency="USD",
+            actor="operator:test",
+            reason="would exhaust operating minimum",
+            policy_decision_id=decision.id,
+            idempotency_key="wallet-transfer-budget-exhausted",
+        )
+
+    assert wallets["operating"].balance == Decimal("50.00")
+    assert wallets["reserve"].balance == Decimal("25.00")
+    assert sqlite_session.scalar(select(WalletTransfer)) is None
+
+
 def test_transfer_replay_does_not_duplicate_balance_or_ledger_mutation(
     sqlite_session,
 ):
