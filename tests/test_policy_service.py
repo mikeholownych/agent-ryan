@@ -319,6 +319,35 @@ def test_time_window_evaluation_converts_aware_timestamp_to_utc(sqlite_session):
     assert "outside active policy time window" in decision.reason
 
 
+def test_malformed_time_window_range_rejects_fail_closed(sqlite_session):
+    _create_wallets(sqlite_session)
+    _create_required_rules(sqlite_session)
+    time_window_rule = sqlite_session.scalar(
+        select(PolicyRule).where(PolicyRule.type == "time_window")
+    )
+    time_window_rule.configuration = {
+        "windows": [
+            {
+                "name": "invalid-all-day-window",
+                "start_hour_utc": -1,
+                "end_hour_utc": 25,
+                "days": ["mon"],
+                "timezone": "UTC",
+            }
+        ]
+    }
+    sqlite_session.flush()
+
+    decision = evaluate_policy(
+        sqlite_session,
+        request=_expense_request(reference_id="expense-invalid-window"),
+        timestamp=_monday_noon(),
+    )
+
+    assert decision.decision == "reject"
+    assert "time window rule has invalid hour range" in decision.reason
+
+
 def test_uncertain_spend_threshold_config_rejects_fail_closed(sqlite_session):
     _create_wallets(sqlite_session)
     _create_required_rules(
@@ -337,6 +366,24 @@ def test_uncertain_spend_threshold_config_rejects_fail_closed(sqlite_session):
         decision.reason
     )
     assert decision.rule_results["spend_threshold"]["decision"] == "reject"
+
+
+def test_malformed_request_amount_rejects_with_persisted_decision(sqlite_session):
+    _create_wallets(sqlite_session)
+    _create_required_rules(sqlite_session)
+
+    decision = evaluate_policy(
+        sqlite_session,
+        request=_expense_request(
+            amount=Decimal("NaN"),
+            reference_id="expense-nan-amount",
+        ),
+        timestamp=_monday_noon(),
+    )
+
+    assert decision.decision == "reject"
+    assert "missing required policy input: amount" in decision.reason
+    assert sqlite_session.get(PolicyDecision, decision.id) is not None
 
 
 def test_malformed_numeric_policy_config_rejects_with_persisted_decision(

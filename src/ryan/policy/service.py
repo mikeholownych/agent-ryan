@@ -421,7 +421,10 @@ def _first_missing_required_input(
     for field_name, value in required_values.items():
         if value is None or value == "":
             return field_name
-    if request.amount <= Decimal("0"):
+    if (
+        not request.amount.is_finite()
+        or request.amount <= Decimal("0")
+    ):
         return "amount"
     return None
 
@@ -602,9 +605,22 @@ def _evaluate_time_window(
         start_hour = window.get("start_hour_utc")
         end_hour = window.get("end_hour_utc")
         if (
+            not isinstance(start_hour, int)
+            or not isinstance(end_hour, int)
+            or start_hour < 0
+            or start_hour > 23
+            or end_hour < 1
+            or end_hour > 24
+            or start_hour >= end_hour
+        ):
+            return {
+                "passed": False,
+                "decision": "reject",
+                "reason": "time window rule has invalid hour range",
+                "window": window.get("name"),
+            }
+        if (
             day in (window.get("days") or [])
-            and isinstance(start_hour, int)
-            and isinstance(end_hour, int)
             and start_hour <= occurred_at.hour < end_hour
         ):
             return {
