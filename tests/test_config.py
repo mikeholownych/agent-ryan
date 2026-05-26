@@ -148,6 +148,13 @@ def test_sandbox_can_use_defaults_while_production_requires_explicit_values():
                 AllocationTarget.RESERVE: Decimal("20"),
             }
         ),
+        operator_api_key="operator-production-key-32-bytes",
+        agent_api_key="agent-production-key-32-bytes",
+        payment_rail="stripe",
+        stripe_api_key="sk_live_test_value_for_validation",
+        stripe_webhook_secret="whsec_test_value_for_validation",
+        secret_backend="aws_secrets_manager",
+        hosting_environment="container",
         _env_file=None,
     )
 

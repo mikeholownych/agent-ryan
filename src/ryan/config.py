@@ -234,6 +234,13 @@ class Settings(BaseSettings):
     revenue_allocation: RevenueAllocationConfig = Field(
         default_factory=_default_revenue_allocation
     )
+    operator_api_key: str | None = None
+    agent_api_key: str | None = None
+    payment_rail: Literal["simulated", "stripe"] = "simulated"
+    stripe_api_key: str | None = None
+    stripe_webhook_secret: str | None = None
+    secret_backend: Literal["environment", "aws_secrets_manager"] = "environment"
+    hosting_environment: Literal["local", "container", "aws_ecs"] = "local"
 
     @model_validator(mode="after")
     def fail_closed_for_missing_production_policy(self) -> "Settings":
@@ -253,6 +260,21 @@ class Settings(BaseSettings):
 
         if not self.business_model.production_ready:
             raise ValueError("production business model must be marked production_ready")
+
+        if not self.operator_api_key or not self.agent_api_key:
+            raise ValueError("production requires operator_api_key and agent_api_key")
+
+        if self.payment_rail != "stripe":
+            raise ValueError("production payment rail must be stripe")
+
+        if not self.stripe_api_key or not self.stripe_webhook_secret:
+            raise ValueError("production requires Stripe API key and webhook secret")
+
+        if self.secret_backend == "environment":
+            raise ValueError("production requires external secret_backend")
+
+        if self.hosting_environment == "local":
+            raise ValueError("production requires non-local hosting_environment")
 
         return self
 
