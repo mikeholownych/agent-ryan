@@ -5,11 +5,19 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
 from ryan.db import Base, create_database_engine
-from ryan.models import LedgerEntry, PolicyDecision, Wallet, WalletTransfer
+from ryan.models import (
+    BucketAllocation,
+    LedgerEntry,
+    Payment,
+    PolicyDecision,
+    Wallet,
+    WalletTransfer,
+)
 from ryan.wallets.service import (
     WalletPolicyError,
     WalletTransferError,
     WalletNotFoundError,
+    allocate_settled_revenue,
     freeze_wallet,
     list_wallets,
     transfer_between_wallets,
@@ -71,6 +79,21 @@ def _approved_transfer_policy(session, *, reference_id="wallet-transfer-001"):
     session.add(decision)
     session.flush()
     return decision
+
+
+def _settled_payment(session):
+    payment = Payment(
+        amount=Decimal("100.00"),
+        currency="USD",
+        status="settled",
+        source="simulated",
+        payment_provider="simulated",
+        provider_reference="provider-payment-001",
+        idempotency_key="payment-001",
+    )
+    session.add(payment)
+    session.flush()
+    return payment
 
 
 def test_list_wallets_returns_mvp_wallets_in_stable_order(sqlite_session):
@@ -300,3 +323,99 @@ def test_transfer_replay_does_not_duplicate_balance_or_ledger_mutation(
         )
         == 2
     )
+
+
+def test_settled_revenue_allocation_moves_payment_across_mvp_wallets(
+    sqlite_session,
+):
+    wallets = _create_wallets(sqlite_session)
+    payment = _settled_payment(sqlite_session)
+
+    allocations = allocate_settled_revenue(
+        sqlite_session,
+        payment_id=payment.id,
+        source_wallet_id=wallets["revenue"].id,
+        allocations={
+            "revenue": Decimal("20.00"),
+            "operating": Decimal("60.00"),
+            "reserve": Decimal("20.00"),
+        },
+        currency="USD",
+        actor="system:settlement",
+        allocation_rule_reference="seeded-mvp-allocation",
+        idempotency_key="allocation-payment-001",
+    )
+
+    assert [allocation.amount for allocation in allocations] == [
+        Decimal("20.00"),
+        Decimal("60.00"),
+        Decimal("20.00"),
+    ]
+    assert wallets["revenue"].balance == Decimal("20.00")
+    assert wallets["operating"].balance == Decimal("110.00")
+    assert wallets["reserve"].balance == Decimal("45.00")
+    assert sqlite_session.scalar(select(func.count(BucketAllocation.id))) == 3
+    assert (
+        sqlite_session.scalar(
+            select(func.count(LedgerEntry.id)).where(
+                LedgerEntry.reference_type == "bucket_allocation"
+            )
+        )
+        == 5
+    )
+
+
+def test_settled_revenue_allocation_replay_does_not_duplicate_mutation(
+    sqlite_session,
+):
+    wallets = _create_wallets(sqlite_session)
+    payment = _settled_payment(sqlite_session)
+    payload = {
+        "payment_id": payment.id,
+        "source_wallet_id": wallets["revenue"].id,
+        "allocations": {
+            "revenue": Decimal("20.00"),
+            "operating": Decimal("60.00"),
+            "reserve": Decimal("20.00"),
+        },
+        "currency": "USD",
+        "actor": "system:settlement",
+        "allocation_rule_reference": "seeded-mvp-allocation",
+        "idempotency_key": "allocation-payment-001",
+    }
+
+    first_allocations = allocate_settled_revenue(sqlite_session, **payload)
+    second_allocations = allocate_settled_revenue(sqlite_session, **payload)
+
+    assert [allocation.id for allocation in second_allocations] == [
+        allocation.id for allocation in first_allocations
+    ]
+    assert wallets["revenue"].balance == Decimal("20.00")
+    assert wallets["operating"].balance == Decimal("110.00")
+    assert wallets["reserve"].balance == Decimal("45.00")
+    assert sqlite_session.scalar(select(func.count(BucketAllocation.id))) == 3
+
+
+def test_settled_revenue_allocation_requires_all_mvp_wallets(sqlite_session):
+    wallets = _create_wallets(sqlite_session)
+    payment = _settled_payment(sqlite_session)
+
+    with pytest.raises(WalletTransferError):
+        allocate_settled_revenue(
+            sqlite_session,
+            payment_id=payment.id,
+            source_wallet_id=wallets["revenue"].id,
+            allocations={
+                "revenue": Decimal("40.00"),
+                "operating": Decimal("60.00"),
+            },
+            currency="USD",
+            actor="system:settlement",
+            allocation_rule_reference="seeded-mvp-allocation",
+            idempotency_key="allocation-missing-reserve",
+        )
+
+    assert wallets["revenue"].balance == Decimal("100.00")
+    assert wallets["operating"].balance == Decimal("50.00")
+    assert wallets["reserve"].balance == Decimal("25.00")
+    assert sqlite_session.scalar(select(BucketAllocation)) is None

@@ -8,11 +8,13 @@ from sqlalchemy.orm import Session
 
 from ryan.idempotency import IdempotencyResponseReference, run_idempotent
 from ryan.ledger import append_ledger_entry
-from ryan.models import PolicyDecision, Wallet, WalletTransfer
+from ryan.models import BucketAllocation, Payment, PolicyDecision, Wallet, WalletTransfer
 from ryan.telemetry import emit_freeze_event, emit_unfreeze_event, emit_wallet_event
 
 MVP_WALLET_ORDER = {"revenue": 0, "operating": 1, "reserve": 2}
 WALLET_TRANSFER_IDEMPOTENCY_SCOPE = "wallet_transfer"
+REVENUE_ALLOCATION_IDEMPOTENCY_SCOPE = "revenue_allocation"
+MVP_WALLET_TYPES = frozenset(MVP_WALLET_ORDER)
 
 
 class WalletNotFoundError(ValueError):
@@ -122,6 +124,109 @@ def transfer_between_wallets(
     return transfer
 
 
+def allocate_settled_revenue(
+    session: Session,
+    *,
+    payment_id: str,
+    source_wallet_id: str,
+    allocations: dict[str, Decimal],
+    currency: str,
+    actor: str,
+    allocation_rule_reference: str,
+    idempotency_key: str,
+) -> list[BucketAllocation]:
+    payload = {
+        "payment_id": payment_id,
+        "source_wallet_id": source_wallet_id,
+        "allocations": {key: str(value) for key, value in sorted(allocations.items())},
+        "currency": currency,
+        "actor": actor,
+        "allocation_rule_reference": allocation_rule_reference,
+    }
+    response = run_idempotent(
+        session,
+        scope=REVENUE_ALLOCATION_IDEMPOTENCY_SCOPE,
+        key=idempotency_key,
+        request_payload=payload,
+        operation=lambda: _execute_settled_revenue_allocation(
+            session,
+            payment_id=payment_id,
+            source_wallet_id=source_wallet_id,
+            allocations=allocations,
+            currency=currency,
+            actor=actor,
+            allocation_rule_reference=allocation_rule_reference,
+            idempotency_key=idempotency_key,
+        ),
+    )
+    return _list_bucket_allocations_for_payment(
+        session,
+        payment_id=response.response_reference_id,
+        idempotency_key=idempotency_key,
+    )
+
+
+def _execute_settled_revenue_allocation(
+    session: Session,
+    *,
+    payment_id: str,
+    source_wallet_id: str,
+    allocations: dict[str, Decimal],
+    currency: str,
+    actor: str,
+    allocation_rule_reference: str,
+    idempotency_key: str,
+) -> IdempotencyResponseReference:
+    payment = session.get(Payment, payment_id)
+    if payment is None or payment.status != "settled" or payment.currency != currency:
+        raise WalletTransferError("revenue allocation requires a settled payment")
+
+    _assert_valid_revenue_allocation(payment, allocations)
+    source_wallet = _get_wallet_or_raise(session, source_wallet_id)
+    if source_wallet.type != "revenue" or source_wallet.currency != currency:
+        raise WalletTransferError("revenue allocation source must be the revenue wallet")
+    if source_wallet.locked:
+        raise WalletTransferError("revenue allocation source wallet is frozen")
+
+    destination_wallets = _wallets_by_type(session, currency=currency)
+    missing_wallet_types = sorted(MVP_WALLET_TYPES - set(destination_wallets))
+    if missing_wallet_types:
+        raise WalletTransferError(
+            "missing destination wallet for allocation: "
+            + ", ".join(missing_wallet_types)
+        )
+
+    created_allocations: list[BucketAllocation] = []
+    for wallet_type in sorted(allocations, key=MVP_WALLET_ORDER.__getitem__):
+        destination_wallet = destination_wallets[wallet_type]
+        if destination_wallet.locked:
+            raise WalletTransferError("revenue allocation destination wallet is frozen")
+        allocation = BucketAllocation(
+            payment_id=payment.id,
+            source_wallet_id=source_wallet.id,
+            destination_wallet_id=destination_wallet.id,
+            amount=allocations[wallet_type],
+            currency=currency,
+            allocation_rule_reference=allocation_rule_reference,
+            idempotency_key=f"{idempotency_key}:{wallet_type}",
+        )
+        session.add(allocation)
+        session.flush()
+        _apply_bucket_allocation(
+            session,
+            allocation=allocation,
+            source_wallet=source_wallet,
+            destination_wallet=destination_wallet,
+            actor=actor,
+        )
+        created_allocations.append(allocation)
+
+    return IdempotencyResponseReference(
+        response_reference_type="payment",
+        response_reference_id=payment.id,
+    )
+
+
 def _execute_transfer(
     session: Session,
     *,
@@ -194,6 +299,123 @@ def _execute_transfer(
     return IdempotencyResponseReference(
         response_reference_type="wallet_transfer",
         response_reference_id=transfer.id,
+    )
+
+
+def _assert_valid_revenue_allocation(
+    payment: Payment,
+    allocations: dict[str, Decimal],
+) -> None:
+    if set(allocations) != MVP_WALLET_TYPES:
+        raise WalletTransferError("revenue allocation must include all MVP wallets")
+    total = Decimal("0.00")
+    for amount in allocations.values():
+        _assert_valid_transfer_amount(amount)
+        total += amount
+    if total != payment.amount:
+        raise WalletTransferError("revenue allocation must equal settled payment amount")
+
+
+def _wallets_by_type(session: Session, *, currency: str) -> dict[str, Wallet]:
+    return {
+        wallet.type: wallet
+        for wallet in session.scalars(select(Wallet).where(Wallet.currency == currency))
+    }
+
+
+def _apply_bucket_allocation(
+    session: Session,
+    *,
+    allocation: BucketAllocation,
+    source_wallet: Wallet,
+    destination_wallet: Wallet,
+    actor: str,
+) -> None:
+    if destination_wallet.id == source_wallet.id:
+        _append_allocation_ledger_entry(
+            session,
+            allocation=allocation,
+            wallet=destination_wallet,
+            type="wallet.allocation.retained",
+            amount=allocation.amount,
+            actor=actor,
+        )
+        return
+
+    if source_wallet.balance < allocation.amount:
+        raise WalletTransferError("revenue allocation source has insufficient funds")
+    source_wallet.balance -= allocation.amount
+    destination_wallet.balance += allocation.amount
+    session.flush()
+    _append_allocation_ledger_entry(
+        session,
+        allocation=allocation,
+        wallet=source_wallet,
+        type="wallet.allocation.debit",
+        amount=-allocation.amount,
+        actor=actor,
+    )
+    _append_allocation_ledger_entry(
+        session,
+        allocation=allocation,
+        wallet=destination_wallet,
+        type="wallet.allocation.credit",
+        amount=allocation.amount,
+        actor=actor,
+    )
+
+
+def _append_allocation_ledger_entry(
+    session: Session,
+    *,
+    allocation: BucketAllocation,
+    wallet: Wallet,
+    type: str,
+    amount: Decimal,
+    actor: str,
+) -> None:
+    append_ledger_entry(
+        session,
+        type=type,
+        amount=amount,
+        currency=allocation.currency,
+        reference_type="bucket_allocation",
+        reference_id=allocation.id,
+        actor=actor,
+        metadata={
+            "payment_id": allocation.payment_id,
+            "source_wallet_id": allocation.source_wallet_id,
+            "destination_wallet_id": allocation.destination_wallet_id,
+            "wallet_id": wallet.id,
+            "allocation_rule_reference": allocation.allocation_rule_reference,
+        },
+    )
+
+
+def _list_bucket_allocations_for_payment(
+    session: Session,
+    *,
+    payment_id: str,
+    idempotency_key: str,
+) -> list[BucketAllocation]:
+    allocations = list(
+        session.scalars(
+            select(BucketAllocation).where(
+                BucketAllocation.payment_id == payment_id,
+                BucketAllocation.idempotency_key.in_(
+                    [
+                        f"{idempotency_key}:{wallet_type}"
+                        for wallet_type in MVP_WALLET_TYPES
+                    ]
+                ),
+            )
+        )
+    )
+    return sorted(
+        allocations,
+        key=lambda allocation: MVP_WALLET_ORDER[
+            session.get(Wallet, allocation.destination_wallet_id).type
+        ],
     )
 
 
@@ -284,9 +506,12 @@ def _get_wallet_or_raise(session: Session, wallet_id: str) -> Wallet:
 
 
 __all__ = [
+    "REVENUE_ALLOCATION_IDEMPOTENCY_SCOPE",
+    "WALLET_TRANSFER_IDEMPOTENCY_SCOPE",
     "WalletPolicyError",
     "WalletNotFoundError",
     "WalletTransferError",
+    "allocate_settled_revenue",
     "freeze_wallet",
     "list_wallets",
     "transfer_between_wallets",
