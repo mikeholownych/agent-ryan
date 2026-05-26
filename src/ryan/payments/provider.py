@@ -20,6 +20,24 @@ class ProviderCheckoutResult:
     checkout_url: str
 
 
+@dataclass(frozen=True)
+class ProviderConfirmationRequest:
+    provider_event_id: str
+    amount: Decimal
+    currency: str
+    status: str
+    verification_token: str
+
+
+@dataclass(frozen=True)
+class ProviderConfirmationResult:
+    provider_event_id: str
+    amount: Decimal
+    currency: str
+    status: str
+    verified: bool
+
+
 class SimulatedPaymentProvider:
     name = "simulated"
 
@@ -34,9 +52,23 @@ class SimulatedPaymentProvider:
             checkout_url=f"https://payments.local/checkout/{provider_reference}",
         )
 
+    def verify_confirmation(
+        self,
+        request: ProviderConfirmationRequest,
+    ) -> ProviderConfirmationResult:
+        return ProviderConfirmationResult(
+            provider_event_id=request.provider_event_id,
+            amount=request.amount,
+            currency=request.currency,
+            status=request.status,
+            verified=request.verification_token == "simulated-valid",
+        )
+
 
 __all__ = [
     "ProviderCheckoutRequest",
     "ProviderCheckoutResult",
+    "ProviderConfirmationRequest",
+    "ProviderConfirmationResult",
     "SimulatedPaymentProvider",
 ]
