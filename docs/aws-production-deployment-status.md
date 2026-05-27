@@ -24,6 +24,8 @@
 ### Security Groups
 
 - ALB security group: `ryan-prod-alb-sg`, `sg-08585703d14db10a8`
+  - inbound HTTP `80` from `0.0.0.0/0`
+  - inbound HTTPS `443` from `0.0.0.0/0`
 - ECS task security group: `ryan-prod-ecs-sg`, `sg-09b1eea45716fa5be`
 - RDS security group: `ryan-prod-rds-sg`, `sg-0a0db80c24d2db515`
 
@@ -93,7 +95,12 @@ configuration are not available.
 The domain is registered at Spaceship. Enter the assigned name servers at
 Spaceship to delegate `agentryan.blog` to Route 53.
 
-No Ryan-specific TLS certificate is configured yet.
+- API hostname: `api.agentryan.blog`
+- API DNS record: Route 53 alias `A` record to `ryan-prod-alb-702663567.ca-central-1.elb.amazonaws.com`
+- ACM certificate: `arn:aws:acm:ca-central-1:352818908635:certificate/f36c7668-df33-4044-b05d-d534e55d4a96`
+- Certificate status: `ISSUED`
+- ALB HTTPS listener: `443`
+- ALB HTTP listener: `80`, redirects to HTTPS
 
 ### Logs
 
@@ -112,6 +119,14 @@ No Ryan-specific TLS certificate is configured yet.
 - Alembic migration ran from ECS against the private PostgreSQL database.
 - Migration task exited with code `0`.
 - Migration logs show PostgreSQL backend and upgrade to `5d79256e586a`.
+- Public DNS delegation for `agentryan.blog` resolves to the Route 53 name servers.
+- `api.agentryan.blog` resolves to the Ryan ALB.
+- HTTP requests to `api.agentryan.blog` redirect to HTTPS.
+- HTTPS reaches the Ryan ALB.
+
+Current HTTPS response from `api.agentryan.blog/health` is `503` because no
+long-running ECS service has been started and the target group has no registered
+targets.
 
 ## Production Blockers
 
@@ -121,8 +136,8 @@ Ryan is not live production-ready yet. The following gates remain blocked:
 - Real Stripe production webhook secret is not provisioned for Ryan.
 - Stripe webhook endpoint is not configured for the deployed Ryan URL.
 - Stripe success and cancel URLs are not finalized for a Ryan production domain.
-- Domain delegation is pending at Spaceship.
-- Ryan-specific TLS certificate is not configured.
+- Long-running ECS service has not been started, so the ALB target group has no
+  registered targets.
 - Final operator-approved production policy values are not provisioned:
   - business model,
   - offer catalog,
