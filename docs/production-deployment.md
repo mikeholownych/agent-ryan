@@ -59,6 +59,16 @@ Run migrations before starting production traffic:
 uv run alembic upgrade head
 ```
 
+## Seed Production Data
+
+After migrations and before routing traffic, run the explicit MVP seed path with
+the same production settings used by the web service. The app does not seed
+offers, policy rules, wallets, or the inactive kill-switch state automatically
+on startup.
+
+The seed step must use production Secrets Manager injection and must complete
+with exit code `0` before the ECS service is started.
+
 ## Start
 
 ```bash
@@ -114,6 +124,45 @@ dependency:
 
 If any external dependency is missing, invalid, or unreachable, Ryan remains
 production-ready in code only and must not be treated as live production.
+
+## Current AWS Production Runtime
+
+The live AWS deployment uses:
+
+- ECS service: `ryan-prod-web`.
+- ECS task definition: `ryan-prod-web:1`.
+- Image: `352818908635.dkr.ecr.ca-central-1.amazonaws.com/ryan-prod:b43046d`.
+- Public API URL: `https://api.agentryan.blog`.
+- Health endpoint: `https://api.agentryan.blog/health`.
+- Readiness endpoint: `https://api.agentryan.blog/api/production/readiness`.
+- Stripe webhook URL:
+  `https://api.agentryan.blog/api/payments/stripe/webhook`.
+- Stripe success URL for the seed deployment:
+  `https://api.agentryan.blog/health?checkout=success`.
+- Stripe cancel URL for the seed deployment:
+  `https://api.agentryan.blog/health?checkout=cancel`.
+
+Private ECS tasks require outbound egress for ECR, Secrets Manager, CloudWatch
+Logs, and Stripe. In the current AWS footprint, private subnet egress is routed
+through NAT gateway `nat-0f4348356905bd5fd`.
+
+The current seed policy is the operator-approved `$100` launch policy:
+
+- one active offer,
+- one approved demand source,
+- vendor allowlist limited to Stripe, required infrastructure, and domain
+  vendors,
+- autonomous spend threshold `$15`,
+- category spend cap `$25` per category per day,
+- operator business-hours spend window,
+- reserve minimum `$40`,
+- revenue floor `$20`,
+- allocation policy `40%` operating, `40%` revenue, `20%` reserve.
+
+The live Stripe Checkout Session creation path has been validated without
+completing a paid Checkout. A paid live Checkout completion and resulting Stripe
+webhook settlement remain operator-gated because they create live financial
+activity.
 
 ## First Post-Deployment Task
 

@@ -6,6 +6,7 @@
 - AWS profile used for deployment: `SyndicateAdmin-352818908635`
 - AWS region: `ca-central-1`
 - Deployment date: `2026-05-26`
+- Live service date: `2026-05-27`
 
 ## Resources Created
 
@@ -20,6 +21,11 @@
   - `ryan-prod-private-b`, `subnet-00d6a51a6c874c825`, `ca-central-1b`, `10.42.11.0/24`
 - Internet gateway: `ryan-prod-igw`, `igw-041ec844983b20602`
 - Public route table: `ryan-prod-public-rt`, `rtb-0b0f60ff84dd26e2f`
+- NAT gateway: `ryan-prod-nat-a`, `nat-0f4348356905bd5fd`
+- Private route table: `rtb-0d9c6380945566a9f`
+  - default route `0.0.0.0/0` targets `nat-0f4348356905bd5fd`
+  - required so private ECS tasks can pull ECR images, read Secrets Manager,
+    write CloudWatch logs, and call Stripe while remaining off public subnets
 
 ### Security Groups
 
@@ -56,6 +62,18 @@ Secrets were created without committing or printing secret values:
 - `ryan/prod/database-url`
 - `ryan/prod/stripe-api-key`
 - `ryan/prod/stripe-webhook-secret`
+- `ryan/prod/stripe-success-url`
+- `ryan/prod/stripe-cancel-url`
+- `ryan/prod/business-model`
+- `ryan/prod/offer-catalog`
+- `ryan/prod/approved-demand-sources`
+- `ryan/prod/vendor-allowlist`
+- `ryan/prod/spend-threshold`
+- `ryan/prod/category-budgets`
+- `ryan/prod/spend-time-windows`
+- `ryan/prod/revenue-floor`
+- `ryan/prod/reserve-minimum`
+- `ryan/prod/revenue-allocation`
 
 ### IAM
 
@@ -68,10 +86,13 @@ The execution role can read Ryan production secrets under `ryan/prod/*`.
 
 - ECS cluster: `arn:aws:ecs:ca-central-1:352818908635:cluster/ryan-prod`
 - Migration task definition: `arn:aws:ecs:ca-central-1:352818908635:task-definition/ryan-prod-migrate:1`
-
-No long-running Ryan production service has been started yet because required
-production Stripe credentials, final policy configuration, and production URL
-configuration are not available.
+- Web task definition: `arn:aws:ecs:ca-central-1:352818908635:task-definition/ryan-prod-web:1`
+- ECS service: `arn:aws:ecs:ca-central-1:352818908635:service/ryan-prod/ryan-prod-web`
+- Desired tasks: `1`
+- Running tasks: `1`
+- Service state: `ACTIVE`
+- Web image: `352818908635.dkr.ecr.ca-central-1.amazonaws.com/ryan-prod:b43046d`
+- Production seed task completed successfully with exit code `0`.
 
 ### Load Balancer
 
@@ -134,50 +155,52 @@ Spaceship to delegate `agentryan.blog` to Route 53.
   - livemode: `true`
 - Stripe webhook signing secret was stored in
   `ryan/prod/stripe-webhook-secret` without printing or committing the value.
+- Final operator-approved production policy values were provisioned in Secrets
+  Manager and injected into `ryan-prod-web:1`:
+  - one active `$100` offer,
+  - one approved demand source,
+  - vendor allowlist for Stripe, AWS, and Spaceship,
+  - autonomous spend threshold `$15`,
+  - category cap `$25` per category per day,
+  - operator business hours Monday-Friday,
+  - reserve minimum `$40`,
+  - revenue floor `$20`,
+  - wallet allocation `40%` operating, `40%` revenue, `20%` reserve.
+- Stripe seed success URL is
+  `https://api.agentryan.blog/health?checkout=success`.
+- Stripe seed cancel URL is
+  `https://api.agentryan.blog/health?checkout=cancel`.
+- Live ECS target group reached `healthy`.
+- `https://api.agentryan.blog/health` returned `200`.
+- Unauthenticated `/api/production/readiness` returned `401`.
+- Wrong-key `/api/production/readiness` returned `401`.
+- Operator-authenticated `/api/production/readiness` returned `200` with
+  `ready=true` and no blockers.
+- Agent-authenticated `/api/status` returned `200`.
+- Agent access to `/api/operator/console` returned `403`.
+- Operator access to `/api/operator/console` returned `200`.
+- A live Stripe Checkout Session creation against `seed-100` returned `201`.
+- Replaying the same payment-create idempotency key returned the same checkout
+  session and provider reference.
+- Stripe webhook endpoint remains enabled for `checkout.session.completed`.
+- Production safety checks passed:
+  - kill switch activation caused policy evaluation to reject spend,
+  - kill switch was deactivated after validation,
+  - operating wallet freeze caused policy evaluation to reject spend,
+  - operating wallet was unfrozen after validation,
+  - missing policy input rejected fail-closed.
+- CloudWatch logs were scanned for obvious secret markers; no secret material
+  was detected.
 
-Current HTTPS response from `api.agentryan.blog/health` is `503` because no
-long-running ECS service has been started and the target group has no registered
-targets.
+## Remaining Operator-Gated Validation
 
-## Production Blockers
+The live service is operational and protected. The only remaining validation
+that was not executed is a real paid Checkout completion and resulting live
+Stripe webhook settlement. That step requires explicit operator approval for
+the payment amount and payment method because it creates live financial
+activity.
 
-Ryan is not live production-ready yet. The following gates remain blocked:
-
-- Stripe success and cancel URLs are not finalized for a Ryan production domain.
-- Long-running ECS service has not been started, so the ALB target group has no
-  registered targets.
-- Final operator-approved production policy values are not provisioned:
-  - business model,
-  - offer catalog,
-  - approved demand sources,
-  - vendor allowlist,
-  - spend threshold,
-  - category budgets,
-  - spend time windows,
-  - revenue floor,
-  - reserve minimum,
-  - revenue allocation.
-- Long-running ECS service has not been started.
-- Live `/health` and `/api/production/readiness` checks have not been validated
-  from the deployed URL.
-- Production RBAC has not been validated against the deployed URL.
-- Live Stripe payment flow has not been validated.
-
-## Next Deployment Step
-
-After the missing production secrets, production URL, and final policy values
-are provisioned, register the long-running Ryan ECS task definition with:
-
-- `RYAN_ENVIRONMENT=production`
-- `RYAN_PAYMENT_RAIL=stripe`
-- `RYAN_SECRET_BACKEND=aws_secrets_manager`
-- `RYAN_HOSTING_ENVIRONMENT=aws_ecs`
-- `RYAN_DATABASE_URL` sourced from `ryan/prod/database-url`
-- `RYAN_OPERATOR_API_KEY` sourced from `ryan/prod/operator-api-key`
-- `RYAN_AGENT_API_KEY` sourced from `ryan/prod/agent-api-key`
-- Stripe values sourced from Ryan-specific Secrets Manager entries
-- final production policy values supplied through approved configuration
-
-Then create or update the ECS service, validate `/health`, validate production
-RBAC, call `/api/production/readiness` with operator credentials, and validate a
-safe Stripe flow before allowing customer traffic.
+Until that approval is supplied and the payment is completed, customer-facing
+payment capture should remain operator-gated. The Stripe production credential,
+Checkout Session creation path, idempotent replay behavior, and webhook endpoint
+configuration have been validated without printing or committing secrets.
