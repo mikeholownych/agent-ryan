@@ -81,7 +81,19 @@ configuration are not available.
 - Target port: `8000`
 - Health check path: `/health`
 
-No Ryan-specific DNS name or TLS certificate is configured yet.
+### DNS
+
+- Route 53 hosted zone: `agentryan.blog`, `/hostedzone/Z07616433UAN1MRG6QU3O`
+- Assigned name servers:
+  - `ns-76.awsdns-09.com`
+  - `ns-645.awsdns-16.net`
+  - `ns-1267.awsdns-30.org`
+  - `ns-1943.awsdns-50.co.uk`
+
+The domain is registered at Spaceship. Enter the assigned name servers at
+Spaceship to delegate `agentryan.blog` to Route 53.
+
+No Ryan-specific TLS certificate is configured yet.
 
 ### Logs
 
@@ -109,7 +121,8 @@ Ryan is not live production-ready yet. The following gates remain blocked:
 - Real Stripe production webhook secret is not provisioned for Ryan.
 - Stripe webhook endpoint is not configured for the deployed Ryan URL.
 - Stripe success and cancel URLs are not finalized for a Ryan production domain.
-- Ryan-specific DNS and TLS certificate are not configured.
+- Domain delegation is pending at Spaceship.
+- Ryan-specific TLS certificate is not configured.
 - Final operator-approved production policy values are not provisioned:
   - business model,
   - offer catalog,
