@@ -24,7 +24,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if resolved_settings.environment != "production":
             return await call_next(request)
 
-        if request.url.path == "/health":
+        if request.url.path in {"/health", "/api/payments/stripe/webhook"}:
             return await call_next(request)
 
         role = request.headers.get("X-Ryan-Role", "")

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+from decimal import ROUND_HALF_UP
+import hashlib
+import hmac
+import json
+import time
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
@@ -17,6 +22,7 @@ from ryan.payments.service import (
     PaymentRefundError,
     PaymentRefundPolicyError,
     PaymentRequestError,
+    confirm_trusted_provider_payment,
     confirm_payment,
     create_refund,
     create_payment_request,
@@ -88,6 +94,10 @@ class PaymentResponse(BaseModel):
 class PaymentLookupResponse(BaseModel):
     kind: str
     record: CheckoutSessionResponse | PaymentResponse
+
+
+class StripeWebhookResponse(BaseModel):
+    received: bool
 
 
 @router.post(
@@ -166,6 +176,81 @@ def post_payment_confirm(
     return payment
 
 
+@router.post("/stripe/webhook", response_model=StripeWebhookResponse)
+async def post_stripe_webhook(
+    request: Request,
+    stripe_signature: str | None = Header(default=None, alias="Stripe-Signature"),
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+):
+    if settings.stripe_webhook_secret is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Stripe webhook secret is not configured",
+        )
+
+    payload = await request.body()
+    if not _stripe_signature_is_valid(
+        payload=payload,
+        signature_header=stripe_signature,
+        webhook_secret=settings.stripe_webhook_secret,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid Stripe webhook signature",
+        )
+
+    try:
+        event = json.loads(payload)
+    except json.JSONDecodeError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid Stripe webhook payload",
+        ) from error
+
+    if event.get("type") != "checkout.session.completed":
+        return StripeWebhookResponse(received=True)
+
+    stripe_session = event.get("data", {}).get("object", {})
+    if stripe_session.get("payment_status") != "paid":
+        return StripeWebhookResponse(received=True)
+
+    try:
+        amount = _stripe_minor_units_to_decimal(stripe_session["amount_total"])
+        currency = str(stripe_session["currency"]).upper()
+        checkout_reference = str(stripe_session["id"])
+        event_id = str(event["id"])
+    except (KeyError, TypeError, ValueError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="invalid Stripe checkout completion payload",
+        ) from error
+
+    try:
+        payment = confirm_trusted_provider_payment(
+            session,
+            payment_provider="stripe",
+            checkout_provider_reference=checkout_reference,
+            provider_event_id=event_id,
+            amount=amount,
+            currency=currency,
+            status="settled",
+            actor="stripe:webhook",
+            idempotency_key=f"stripe-webhook:{event_id}",
+        )
+        settle_revenue_for_payment(
+            session,
+            payment=payment,
+            actor="stripe:webhook",
+            idempotency_key=f"stripe-webhook:{event_id}",
+        )
+    except PaymentConfirmationError as error:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
+
+    session.commit()
+    return StripeWebhookResponse(received=True)
+
+
 @router.post(
     "/refund",
     response_model=PaymentResponse,
@@ -208,6 +293,48 @@ def get_payment(payment_id: str, session: Session = Depends(get_session)):
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"payment or checkout session {payment_id!r} was not found",
+    )
+
+
+def _stripe_signature_is_valid(
+    *,
+    payload: bytes,
+    signature_header: str | None,
+    webhook_secret: str,
+    tolerance_seconds: int = 300,
+) -> bool:
+    if signature_header is None:
+        return False
+    parts = {
+        key: value
+        for part in signature_header.split(",")
+        if "=" in part
+        for key, value in [part.split("=", 1)]
+    }
+    timestamp = parts.get("t")
+    signature = parts.get("v1")
+    if timestamp is None or signature is None:
+        return False
+    try:
+        timestamp_int = int(timestamp)
+    except ValueError:
+        return False
+    if abs(time.time() - timestamp_int) > tolerance_seconds:
+        return False
+
+    signed_payload = timestamp.encode() + b"." + payload
+    expected = hmac.new(
+        webhook_secret.encode(),
+        signed_payload,
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(expected, signature)
+
+
+def _stripe_minor_units_to_decimal(amount_total: int) -> Decimal:
+    return (Decimal(amount_total) / Decimal("100")).quantize(
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
     )
 
 

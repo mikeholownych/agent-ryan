@@ -117,6 +117,50 @@ def confirm_payment(
     return payment
 
 
+def confirm_trusted_provider_payment(
+    session: Session,
+    *,
+    payment_provider: str,
+    checkout_provider_reference: str,
+    provider_event_id: str,
+    amount: Decimal,
+    currency: str,
+    status: str,
+    actor: str,
+    idempotency_key: str,
+) -> Payment:
+    payload = {
+        "payment_provider": payment_provider,
+        "checkout_provider_reference": checkout_provider_reference,
+        "provider_event_id": provider_event_id,
+        "amount": str(amount),
+        "currency": currency,
+        "status": status,
+        "actor": actor,
+    }
+    response = run_idempotent(
+        session,
+        scope=PAYMENT_CONFIRM_IDEMPOTENCY_SCOPE,
+        key=idempotency_key,
+        request_payload=payload,
+        operation=lambda: _confirm_trusted_provider_payment_once(
+            session,
+            payment_provider=payment_provider,
+            checkout_provider_reference=checkout_provider_reference,
+            provider_event_id=provider_event_id,
+            amount=amount,
+            currency=currency,
+            status=status,
+            actor=actor,
+            idempotency_key=idempotency_key,
+        ),
+    )
+    payment = session.get(Payment, response.response_reference_id)
+    if payment is None:
+        raise PaymentConfirmationError("idempotent payment reference is missing")
+    return payment
+
+
 def settle_revenue_for_payment(
     session: Session,
     *,
@@ -267,7 +311,11 @@ def _confirm_payment_once(
     actor: str,
     idempotency_key: str,
 ) -> IdempotencyResponseReference:
-    existing_payment = _payment_by_provider_event(session, provider_event_id)
+    existing_payment = _payment_by_provider_event(
+        session,
+        payment_provider="simulated",
+        provider_event_id=provider_event_id,
+    )
     if existing_payment is not None:
         return IdempotencyResponseReference(
             response_reference_type="payment",
@@ -276,7 +324,8 @@ def _confirm_payment_once(
 
     checkout_session = _checkout_session_by_provider_reference(
         session,
-        checkout_provider_reference,
+        payment_provider="simulated",
+        provider_reference=checkout_provider_reference,
     )
     provider = SimulatedPaymentProvider()
     confirmation = provider.verify_confirmation(
@@ -345,6 +394,90 @@ def _confirm_payment_once(
             "checkout_session_id": checkout_session.id,
             "provider_event_id": provider_event_id,
             "payment_provider": "simulated",
+            "status": payment_status,
+        },
+    )
+    return IdempotencyResponseReference(
+        response_reference_type="payment",
+        response_reference_id=payment.id,
+    )
+
+
+def _confirm_trusted_provider_payment_once(
+    session: Session,
+    *,
+    payment_provider: str,
+    checkout_provider_reference: str,
+    provider_event_id: str,
+    amount: Decimal,
+    currency: str,
+    status: str,
+    actor: str,
+    idempotency_key: str,
+) -> IdempotencyResponseReference:
+    existing_payment = _payment_by_provider_event(
+        session,
+        payment_provider=payment_provider,
+        provider_event_id=provider_event_id,
+    )
+    if existing_payment is not None:
+        return IdempotencyResponseReference(
+            response_reference_type="payment",
+            response_reference_id=existing_payment.id,
+        )
+
+    checkout_session = _checkout_session_by_provider_reference(
+        session,
+        payment_provider=payment_provider,
+        provider_reference=checkout_provider_reference,
+    )
+    if checkout_session is None:
+        _record_invalid_confirmation_alert(
+            session,
+            actor=actor,
+            checkout_session=None,
+            provider_event_id=provider_event_id,
+            reason="checkout session was not found",
+        )
+        raise PaymentConfirmationError("checkout session was not found")
+
+    if checkout_session.amount != amount or checkout_session.currency != currency:
+        _record_invalid_confirmation_alert(
+            session,
+            actor=actor,
+            checkout_session=checkout_session,
+            provider_event_id=provider_event_id,
+            reason="amount or currency mismatch",
+        )
+        raise PaymentConfirmationError("amount or currency mismatch")
+
+    payment_status = _normalize_payment_status(status)
+    payment = Payment(
+        checkout_session_id=checkout_session.id,
+        amount=amount,
+        currency=currency,
+        status=payment_status,
+        source="customer",
+        payment_provider=payment_provider,
+        provider_reference=provider_event_id,
+        settlement_time=datetime.now(UTC) if payment_status == "settled" else None,
+        idempotency_key=idempotency_key,
+    )
+    session.add(payment)
+    checkout_session.status = payment_status
+    session.flush()
+    append_ledger_entry(
+        session,
+        type="audit.payment.confirmed",
+        amount=payment.amount,
+        currency=payment.currency,
+        reference_type="payment",
+        reference_id=payment.id,
+        actor=actor,
+        metadata={
+            "checkout_session_id": checkout_session.id,
+            "provider_event_id": provider_event_id,
+            "payment_provider": payment_provider,
             "status": payment_status,
         },
     )
@@ -431,11 +564,13 @@ def _assert_approved_refund_policy(
 
 def _payment_by_provider_event(
     session: Session,
+    *,
+    payment_provider: str,
     provider_event_id: str,
 ) -> Payment | None:
     return session.scalar(
         select(Payment).where(
-            Payment.payment_provider == "simulated",
+            Payment.payment_provider == payment_provider,
             Payment.provider_reference == provider_event_id,
         )
     )
@@ -443,11 +578,13 @@ def _payment_by_provider_event(
 
 def _checkout_session_by_provider_reference(
     session: Session,
+    *,
+    payment_provider: str,
     provider_reference: str,
 ) -> CheckoutSession | None:
     return session.scalar(
         select(CheckoutSession).where(
-            CheckoutSession.payment_provider == "simulated",
+            CheckoutSession.payment_provider == payment_provider,
             CheckoutSession.provider_reference == provider_reference,
         )
     )
@@ -564,6 +701,7 @@ __all__ = [
     "PaymentRefundPolicyError",
     "PaymentRequestError",
     "confirm_payment",
+    "confirm_trusted_provider_payment",
     "create_refund",
     "create_payment_request",
     "settle_revenue_for_payment",
