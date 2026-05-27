@@ -195,6 +195,64 @@ def test_execute_api_routes_expense_through_policy(tmp_path):
     session.close()
 
 
+def test_execute_api_blocks_outbound_email_without_draft_controls(tmp_path):
+    client, session = _client_with_session(tmp_path)
+    _seed_agent_state(session)
+
+    response = client.post(
+        "/api/execute",
+        json={
+            "action_type": "email_send",
+            "actor": "agent:ryan",
+            "idempotency_key": "agent-email-001",
+            "email_from": "agentryan@agentmail.to",
+            "email_to": "prospect@example.com",
+            "subject": "Approved offer",
+            "body": "Would you like to buy this?",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["outcome"] == "blocked"
+    assert payload["policy_status"] == "rejected"
+    assert "draft" in payload["reason"]
+    exception = session.scalar(select(ExceptionRecord))
+    assert exception.type == "outbound_email_blocked"
+    assert session.scalar(select(ExpenseRequest)) is None
+    assert session.scalar(
+        select(LedgerEntry).where(LedgerEntry.type == "audit.email.blocked")
+    )
+    session.close()
+
+
+def test_execute_api_blocks_email_from_unapproved_identity(tmp_path):
+    client, session = _client_with_session(tmp_path)
+    _seed_agent_state(session)
+
+    response = client.post(
+        "/api/execute",
+        json={
+            "action_type": "email_reply",
+            "actor": "agent:ryan",
+            "idempotency_key": "agent-email-identity",
+            "email_from": "other@agentmail.to",
+            "email_to": "sender@example.com",
+            "subject": "Re: question",
+            "body": "Thanks.",
+            "draft_status": "drafted",
+            "review_status": "reviewed",
+            "sanitize_status": "sanitized",
+            "approval_status": "approved",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["outcome"] == "blocked"
+    assert "approved email identity" in response.json()["reason"]
+    session.close()
+
+
 def test_execute_api_respects_kill_switch_read_only_mode(tmp_path):
     client, session = _client_with_session(tmp_path)
     _seed_agent_state(session)

@@ -10,11 +10,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ryan.catalog import list_approved_offers
+from ryan.config import Settings, get_settings
 from ryan.db import get_session
+from ryan.exceptions import create_exception_record
 from ryan.expenses import ExpenseRequestError, create_expense_request
 from ryan.kill_switch import get_kill_switch_state
 from ryan.ledger import append_ledger_entry
-from ryan.models import Agent, ExceptionRecord, ExpenseRequest, LedgerEntry, Wallet
+from ryan.models import Agent, ExceptionRecord, ExpenseRequest, LedgerEntry, PolicyDecision, Wallet
 
 router = APIRouter(tags=["agent"])
 
@@ -35,6 +37,14 @@ class ExecuteRequest(BaseModel):
     idempotency_key: str
     timestamp: datetime | None = None
     irreversible: bool = False
+    email_from: str | None = None
+    email_to: str | None = None
+    subject: str | None = None
+    body: str | None = None
+    draft_status: str | None = None
+    review_status: str | None = None
+    sanitize_status: str | None = None
+    approval_status: str | None = None
 
 
 @router.post("/api/plan")
@@ -74,7 +84,14 @@ def post_plan(payload: PlanRequest, session: Session = Depends(get_session)):
 
 
 @router.post("/api/execute")
-def post_execute(payload: ExecuteRequest, session: Session = Depends(get_session)):
+def post_execute(
+    payload: ExecuteRequest,
+    session: Session = Depends(get_session),
+    settings: Settings = Depends(get_settings),
+):
+    if payload.action_type in {"email_send", "email_reply"}:
+        return _evaluate_outbound_email_action(session, payload, settings)
+
     if payload.action_type != "expense_request":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -114,6 +131,91 @@ def post_execute(payload: ExecuteRequest, session: Session = Depends(get_session
         "policy_status": expense.policy_status,
         "execution_status": expense.execution_status,
     }
+
+
+def _evaluate_outbound_email_action(
+    session: Session,
+    payload: ExecuteRequest,
+    settings: Settings,
+) -> dict[str, str]:
+    reason = _outbound_email_block_reason(payload, settings)
+    decision = PolicyDecision(
+        action_type=payload.action_type,
+        decision="reject",
+        reason=reason,
+        rule_results={
+            "approved_identity": {
+                "passed": payload.email_from == settings.agentmail_inbox,
+                "configured_identity": settings.agentmail_inbox,
+            },
+            "workflow": {
+                "draft_status": payload.draft_status,
+                "review_status": payload.review_status,
+                "sanitize_status": payload.sanitize_status,
+                "approval_status": payload.approval_status,
+            },
+            "provider": {
+                "passed": False,
+                "reason": "AgentMail send/reply provider is not wired to autonomous execution",
+            },
+        },
+        request_reference_type="outbound_email",
+        request_reference_id=payload.idempotency_key,
+        actor=payload.actor,
+    )
+    session.add(decision)
+    session.flush()
+    create_exception_record(
+        session,
+        exception_type="outbound_email_blocked",
+        severity="high",
+        reason=reason,
+        reference_type="outbound_email",
+        reference_id=payload.idempotency_key,
+        actor=payload.actor,
+        policy_decision_id=decision.id,
+    )
+    append_ledger_entry(
+        session,
+        type="audit.email.blocked",
+        amount=None,
+        currency=None,
+        reference_type="outbound_email",
+        reference_id=payload.idempotency_key,
+        actor=payload.actor,
+        metadata={
+            "action_type": payload.action_type,
+            "email_from": payload.email_from,
+            "email_to": payload.email_to,
+            "subject": payload.subject,
+            "policy_decision_id": decision.id,
+        },
+        timestamp=payload.timestamp,
+    )
+    session.commit()
+    return {
+        "outcome": "blocked",
+        "policy_status": "rejected",
+        "execution_status": "blocked",
+        "reason": reason,
+    }
+
+
+def _outbound_email_block_reason(payload: ExecuteRequest, settings: Settings) -> str:
+    if payload.email_from != settings.agentmail_inbox:
+        return (
+            "outbound email rejected: sender must match approved email identity "
+            f"{settings.agentmail_inbox}"
+        )
+    if settings.outbound_email_requires_draft and payload.draft_status != "drafted":
+        return "outbound email rejected: draft workflow status is required before send or reply"
+    if settings.outbound_email_requires_review and payload.review_status != "reviewed":
+        return "outbound email rejected: reviewed workflow status is required before send or reply"
+    if settings.outbound_email_requires_sanitization and payload.sanitize_status != "sanitized":
+        return "outbound email rejected: sanitized workflow status is required before send or reply"
+    if settings.outbound_email_requires_approval and payload.approval_status != "approved":
+        return "outbound email rejected: operator approval is required before send or reply"
+    return "outbound email rejected: autonomous AgentMail send/reply execution is disabled"
 
 
 @router.get("/api/status")

@@ -11,6 +11,7 @@ Ryan production deployment uses the following explicit defaults:
   provider. Simulated outbound execution is not production-ready.
 - Treasury account: a real business banking or treasury account reference
   configured through the secret backend.
+- Approved email identity: `agentryan@agentmail.to` through AgentMail.
 - Secret backend: AWS Secrets Manager.
 - Hosting mode: container runtime, with AWS ECS acceptable as the managed target.
 - Database: external transactional database, not SQLite.
@@ -34,6 +35,11 @@ RYAN_OUTBOUND_PAYMENT_RAIL=bank
 RYAN_OUTBOUND_PAYMENT_PROVIDER=...
 RYAN_TREASURY_ACCOUNT_REFERENCE=...
 RYAN_OUTBOUND_LIVE_VALIDATION_APPROVED=true
+RYAN_AGENTMAIL_INBOX=agentryan@agentmail.to
+RYAN_OUTBOUND_EMAIL_REQUIRES_DRAFT=true
+RYAN_OUTBOUND_EMAIL_REQUIRES_REVIEW=true
+RYAN_OUTBOUND_EMAIL_REQUIRES_SANITIZATION=true
+RYAN_OUTBOUND_EMAIL_REQUIRES_APPROVAL=true
 RYAN_SECRET_BACKEND=aws_secrets_manager
 RYAN_HOSTING_ENVIRONMENT=container
 ```
@@ -54,6 +60,11 @@ All production policy fields must also be explicit:
 - `RYAN_REVENUE_FLOOR`
 - `RYAN_RESERVE_MINIMUM`
 - `RYAN_REVENUE_ALLOCATION`
+
+AgentMail may be configured as an approved demand source using
+`agentryan@agentmail.to` with kind `agentmail_inbox`. Outbound email send and
+reply actions must remain policy-gated and require draft, review, sanitization,
+and operator approval before any provider send path is enabled.
 
 Use nested Pydantic environment variables or platform-provided settings serialization according to the deployment system.
 

@@ -32,6 +32,13 @@ def test_sandbox_defaults_include_complete_non_production_policy_config():
 
     assert len(settings.approved_demand_sources) == 1
     assert settings.approved_demand_sources[0].status == "approved"
+    assert settings.approved_demand_sources[0].name == "agentryan@agentmail.to"
+    assert settings.approved_demand_sources[0].kind == "agentmail_inbox"
+
+    assert settings.agentmail_inbox == "agentryan@agentmail.to"
+    assert settings.outbound_email_requires_review is True
+    assert settings.outbound_email_requires_sanitization is True
+    assert settings.outbound_email_requires_approval is True
 
     assert len(settings.vendor_allowlist) == 1
     assert settings.vendor_allowlist[0].status == "approved"

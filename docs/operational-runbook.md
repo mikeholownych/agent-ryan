@@ -54,6 +54,31 @@ Expected behavior:
 - `resolved` and `dismissed` set `resolved_at`.
 - Open exceptions are visible in `GET /api/operator/console`.
 
+## AgentMail Communication Controls
+
+Ryan's approved AgentMail identity is `agentryan@agentmail.to`. AgentMail may
+be used as an approved communication and demand-source layer, but outbound
+email remains blocked unless the operator-approved workflow is present.
+
+Required outbound email workflow:
+
+1. Draft.
+2. Review.
+3. Sanitize.
+4. Approve.
+5. Send or reply only through an explicitly wired provider path.
+
+Current expected behavior:
+
+- `email_send` and `email_reply` actions through `POST /api/execute` are
+  policy-evaluated and recorded, but not sent autonomously.
+- Attempts from any sender other than `agentryan@agentmail.to` are rejected.
+- Attempts missing draft, review, sanitization, or approval state are rejected.
+- Blocked email attempts create an `outbound_email_blocked` exception and an
+  `audit.email.blocked` ledger entry.
+- No AgentMail provider call is made from autonomous execution until a separate
+  approved sender implementation is added.
+
 ## Budget Exhaustion
 
 Budget exhaustion can be triggered by policy evaluation or operating-wallet minimum checks.

@@ -124,8 +124,8 @@ def _default_offer_catalog() -> list[OfferConfig]:
 def _default_demand_sources() -> list[DemandSourceConfig]:
     return [
         DemandSourceConfig(
-            name="sandbox-manual-source",
-            kind="manual_import",
+            name="agentryan@agentmail.to",
+            kind="agentmail_inbox",
             status="approved",
         )
     ]
@@ -249,6 +249,11 @@ class Settings(BaseSettings):
     outbound_payment_provider: str | None = None
     treasury_account_reference: str | None = None
     outbound_live_validation_approved: bool = False
+    agentmail_inbox: str = "agentryan@agentmail.to"
+    outbound_email_requires_draft: bool = True
+    outbound_email_requires_review: bool = True
+    outbound_email_requires_sanitization: bool = True
+    outbound_email_requires_approval: bool = True
     secret_backend: Literal["environment", "aws_secrets_manager"] = "environment"
     hosting_environment: Literal["local", "container", "aws_ecs"] = "local"
 
