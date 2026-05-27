@@ -55,9 +55,6 @@ Secrets were created without committing or printing secret values:
 - `ryan/prod/db-master-password`
 - `ryan/prod/database-url`
 - `ryan/prod/stripe-api-key`
-
-The following required production secrets are not yet provisioned:
-
 - `ryan/prod/stripe-webhook-secret`
 
 ### IAM
@@ -130,6 +127,13 @@ Spaceship to delegate `agentryan.blog` to Route 53.
   profile was stored in `ryan/prod/stripe-api-key` without printing or
   committing the value.
 - Webhook-capable image `b43046d` was built and pushed to ECR.
+- Live Stripe webhook endpoint was created:
+  - endpoint id: `we_1TbVwPEATTvuyEDgZjOnJ6kg`
+  - URL: `https://api.agentryan.blog/api/payments/stripe/webhook`
+  - enabled event: `checkout.session.completed`
+  - livemode: `true`
+- Stripe webhook signing secret was stored in
+  `ryan/prod/stripe-webhook-secret` without printing or committing the value.
 
 Current HTTPS response from `api.agentryan.blog/health` is `503` because no
 long-running ECS service has been started and the target group has no registered
@@ -139,10 +143,6 @@ targets.
 
 Ryan is not live production-ready yet. The following gates remain blocked:
 
-- Real Stripe production webhook secret is not provisioned for Ryan.
-- Stripe webhook endpoint is not configured for the deployed Ryan URL. The
-  authenticated Stripe CLI profile is connected to the `agentryan` account, but
-  its live restricted key does not have permission to create webhook endpoints.
 - Stripe success and cancel URLs are not finalized for a Ryan production domain.
 - Long-running ECS service has not been started, so the ALB target group has no
   registered targets.
