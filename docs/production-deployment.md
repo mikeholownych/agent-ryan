@@ -4,6 +4,8 @@
 
 Ryan production deployment uses the following explicit defaults:
 
+- AWS account: `352818908635`.
+- AWS region: `ca-central-1`.
 - Payment rail: Stripe Checkout.
 - Secret backend: AWS Secrets Manager.
 - Hosting mode: container runtime, with AWS ECS acceptable as the managed target.
