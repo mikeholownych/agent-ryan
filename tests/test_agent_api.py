@@ -6,6 +6,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 from ryan.app import create_app
+from ryan.config import (
+    BusinessModelConfig,
+    CategoryBudgetConfig,
+    DemandSourceConfig,
+    OfferConfig,
+    RevenueAllocationConfig,
+    Settings,
+    SpendThresholdConfig,
+    TimeWindowConfig,
+    VendorConfig,
+)
 from ryan.db import Base, create_database_engine, get_session
 from ryan.kill_switch import activate_kill_switch
 from ryan.models import Agent, ExceptionRecord, ExpenseRequest, LedgerEntry, Offer, Wallet
@@ -27,6 +38,102 @@ def _client_with_session(tmp_path):
 
     app.dependency_overrides[get_session] = override_session
     return TestClient(app), Session()
+
+
+def _production_client_with_session(tmp_path):
+    engine = create_database_engine(f"sqlite:///{tmp_path / 'agent-prod.sqlite3'}")
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    app = create_app(_production_settings())
+
+    def override_session():
+        session = Session()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_session] = override_session
+    return TestClient(app), Session()
+
+
+def _production_settings():
+    return Settings(
+        environment="production",
+        database_url="postgresql+psycopg://prod.example/ryan",
+        business_model=BusinessModelConfig(
+            name="Production business",
+            objective="Serve approved production niche",
+            production_ready=True,
+        ),
+        offer_catalog=[
+            OfferConfig(
+                id="prod-offer-001",
+                name="Production offer",
+                price=Decimal("250.00"),
+                currency="USD",
+                status="active",
+                allowed_channels=["checkout"],
+            )
+        ],
+        approved_demand_sources=[
+            DemandSourceConfig(
+                name="agentryan@agentmail.to",
+                kind="agentmail_inbox",
+                status="approved",
+            )
+        ],
+        vendor_allowlist=[
+            VendorConfig(
+                name="approved-vendor",
+                categories=["software"],
+                status="approved",
+            )
+        ],
+        spend_threshold=SpendThresholdConfig(
+            per_transaction_cap=Decimal("25.00"),
+            currency="USD",
+        ),
+        category_budgets=[
+            CategoryBudgetConfig(
+                category="software",
+                limit=Decimal("100.00"),
+                currency="USD",
+                period="monthly",
+            )
+        ],
+        spend_time_windows=[
+            TimeWindowConfig(
+                name="business-hours",
+                start_hour_utc=9,
+                end_hour_utc=17,
+                days=["mon", "tue", "wed", "thu", "fri"],
+            )
+        ],
+        revenue_floor=Decimal("10.00"),
+        reserve_minimum=Decimal("5.00"),
+        revenue_allocation=RevenueAllocationConfig(
+            wallet_percentages={
+                "revenue": Decimal("50"),
+                "operating": Decimal("30"),
+                "reserve": Decimal("20"),
+            }
+        ),
+        operator_api_key="operator-production-key-32-bytes",
+        agent_api_key="agent-production-key-32-bytes",
+        payment_rail="stripe",
+        stripe_api_key="sk_live_test_value_for_validation",
+        stripe_webhook_secret="whsec_test_value_for_validation",
+        stripe_success_url="https://example.com/success",
+        stripe_cancel_url="https://example.com/cancel",
+        outbound_payment_rail="bank",
+        outbound_payment_provider="example-business-bank",
+        treasury_account_reference="treasury-account-001",
+        outbound_live_validation_approved=True,
+        secret_backend="aws_secrets_manager",
+        hosting_environment="container",
+        _env_file=None,
+    )
 
 
 def _seed_agent_state(session):
@@ -192,6 +299,37 @@ def test_execute_api_routes_expense_through_policy(tmp_path):
     expense = session.scalar(select(ExpenseRequest))
     assert expense.policy_status == "approved"
     assert expense.execution_status == "executed"
+    session.close()
+
+
+def test_production_execute_blocks_expense_when_outbound_provider_has_no_adapter(tmp_path):
+    client, session = _production_client_with_session(tmp_path)
+    _seed_agent_state(session)
+
+    response = client.post(
+        "/api/execute",
+        headers={
+            "X-Ryan-Role": "agent",
+            "X-Ryan-Api-Key": "agent-production-key-32-bytes",
+        },
+        json={
+            "action_type": "expense_request",
+            "vendor": "approved-vendor",
+            "category": "software",
+            "amount": "10.00",
+            "currency": "USD",
+            "rationale": "required software subscription",
+            "actor": "agent:ryan",
+            "idempotency_key": "agent-prod-expense-no-adapter",
+            "timestamp": "2026-05-25T12:00:00+00:00",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "implemented production adapter" in response.json()["detail"]
+    assert session.scalar(select(ExpenseRequest)) is None
+    operating_wallet = session.scalar(select(Wallet).where(Wallet.type == "operating"))
+    assert operating_wallet.balance == Decimal("100.00")
     session.close()
 
 

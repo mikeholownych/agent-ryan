@@ -118,6 +118,8 @@ Production readiness requires:
 - Stripe payment rail with API key, webhook secret, success URL, and cancel URL,
 - outbound payment rail set to `bank`, `treasury`, or `bill_pay`,
 - outbound payment provider configured,
+- outbound payment provider backed by an implemented production adapter in the
+  running code,
 - treasury account reference configured,
 - operator-approved outbound live validation,
 - AWS Secrets Manager selected as secret backend,
@@ -155,6 +157,12 @@ dependency:
 
 If any external dependency is missing, invalid, or unreachable, Ryan remains
 production-ready in code only and must not be treated as live production.
+
+Current implementation note: no real production outbound provider adapter is
+implemented yet. Naming a bank, treasury, or bill-pay provider in configuration
+is not sufficient for readiness. The readiness endpoint must remain blocked
+until the selected provider adapter exists in code, is deployed, and passes
+operator-approved live validation.
 
 ## Current AWS Production Runtime
 

@@ -83,6 +83,10 @@ have not yet been provisioned in the documented AWS runtime:
 - `ryan/prod/treasury-account-reference`
 - `ryan/prod/outbound-live-validation-approved`
 
+Even after those secrets are provisioned, readiness must remain blocked until
+the selected outbound provider has an implemented production adapter in the
+deployed Ryan code. A provider name alone is not a safe outbound payment rail.
+
 ### IAM
 
 - ECS execution role: `arn:aws:iam::352818908635:role/ryan-prod-ecs-execution-role`

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ryan.config import Settings
+from ryan.expenses.provider import implemented_outbound_provider_names
 
 
 @dataclass(frozen=True)
@@ -12,7 +13,9 @@ class ProductionReadinessResult:
     decisions: dict[str, str]
 
 
-def check_production_readiness(settings: Settings) -> ProductionReadinessResult:
+def check_production_readiness(
+    settings: Settings,
+) -> ProductionReadinessResult:
     blockers: list[str] = []
     if settings.environment != "production":
         blockers.append("environment must be production")
@@ -35,8 +38,13 @@ def check_production_readiness(settings: Settings) -> ProductionReadinessResult:
         blockers.append("Stripe API key, webhook secret, success URL, and cancel URL must be configured")
     if settings.outbound_payment_rail == "simulated":
         blockers.append("outbound_payment_rail must be a configured production rail")
+    implemented_outbound_providers = implemented_outbound_provider_names()
     if not settings.outbound_payment_provider:
         blockers.append("outbound_payment_provider must be configured")
+    elif settings.outbound_payment_provider not in implemented_outbound_providers:
+        blockers.append(
+            "outbound_payment_provider must have an implemented production adapter"
+        )
     if not settings.treasury_account_reference:
         blockers.append("treasury_account_reference must be configured")
     if not settings.outbound_live_validation_approved:

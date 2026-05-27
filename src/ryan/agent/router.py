@@ -14,6 +14,10 @@ from ryan.config import Settings, get_settings
 from ryan.db import get_session
 from ryan.exceptions import create_exception_record
 from ryan.expenses import ExpenseRequestError, create_expense_request
+from ryan.expenses.provider import (
+    OutboundPaymentProviderConfigurationError,
+    outbound_provider_from_settings,
+)
 from ryan.kill_switch import get_kill_switch_state
 from ryan.ledger import append_ledger_entry
 from ryan.models import Agent, ExceptionRecord, ExpenseRequest, LedgerEntry, PolicyDecision, Wallet
@@ -120,8 +124,9 @@ def post_execute(
             idempotency_key=payload.idempotency_key,
             timestamp=payload.timestamp,
             irreversible=payload.irreversible,
+            outbound_provider=outbound_provider_from_settings(settings),
         )
-    except ExpenseRequestError as error:
+    except (ExpenseRequestError, OutboundPaymentProviderConfigurationError) as error:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(error))
     session.commit()
     session.refresh(expense)

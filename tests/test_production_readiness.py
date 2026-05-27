@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+import ryan.readiness.service as readiness_service
 from ryan.config import (
     AllocationTarget,
     BusinessModelConfig,
@@ -97,6 +98,12 @@ def _production_settings():
     )
 
 
+def _implemented_outbound_settings():
+    return _production_settings().model_copy(
+        update={"outbound_payment_provider": "test_implemented_bank"}
+    )
+
+
 def test_production_readiness_rejects_sandbox_defaults():
     result = check_production_readiness(Settings(_env_file=None))
 
@@ -104,16 +111,33 @@ def test_production_readiness_rejects_sandbox_defaults():
     assert "environment must be production" in result.blockers
 
 
-def test_production_readiness_accepts_explicit_production_configuration():
-    result = check_production_readiness(_production_settings())
+def test_production_readiness_accepts_explicit_production_configuration_with_implemented_outbound_adapter(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        readiness_service,
+        "implemented_outbound_provider_names",
+        lambda: frozenset({"test_implemented_bank"}),
+    )
+    result = check_production_readiness(_implemented_outbound_settings())
 
     assert result.ready is True
     assert result.blockers == []
     assert result.decisions["payment_rail"] == "stripe"
     assert result.decisions["outbound_payment_rail"] == "bank"
-    assert result.decisions["outbound_payment_provider"] == "example-business-bank"
+    assert result.decisions["outbound_payment_provider"] == "test_implemented_bank"
     assert result.decisions["secret_backend"] == "aws_secrets_manager"
     assert result.decisions["hosting_environment"] == "container"
+
+
+def test_production_readiness_blocks_named_outbound_provider_without_adapter():
+    result = check_production_readiness(_production_settings())
+
+    assert result.ready is False
+    assert (
+        "outbound_payment_provider must have an implemented production adapter"
+        in result.blockers
+    )
 
 
 def test_production_readiness_blocks_missing_outbound_rail_and_treasury_config():
@@ -135,7 +159,7 @@ def test_production_readiness_blocks_missing_outbound_rail_and_treasury_config()
     assert "outbound live validation must be operator-approved" in result.blockers
 
 
-def test_production_readiness_endpoint_returns_ready_state_for_operator():
+def test_production_readiness_endpoint_exposes_outbound_adapter_blocker_for_operator():
     settings = _production_settings()
     client = TestClient(create_app(settings))
 
@@ -148,5 +172,8 @@ def test_production_readiness_endpoint_returns_ready_state_for_operator():
     )
 
     assert response.status_code == 200
-    assert response.json()["ready"] is True
-    assert response.json()["blockers"] == []
+    assert response.json()["ready"] is False
+    assert (
+        "outbound_payment_provider must have an implemented production adapter"
+        in response.json()["blockers"]
+    )
