@@ -33,6 +33,14 @@ def check_production_readiness(settings: Settings) -> ProductionReadinessResult:
         or not settings.stripe_cancel_url
     ):
         blockers.append("Stripe API key, webhook secret, success URL, and cancel URL must be configured")
+    if settings.outbound_payment_rail == "simulated":
+        blockers.append("outbound_payment_rail must be a configured production rail")
+    if not settings.outbound_payment_provider:
+        blockers.append("outbound_payment_provider must be configured")
+    if not settings.treasury_account_reference:
+        blockers.append("treasury_account_reference must be configured")
+    if not settings.outbound_live_validation_approved:
+        blockers.append("outbound live validation must be operator-approved")
     if not settings.business_model.production_ready:
         blockers.append("business model must be marked production_ready")
 
@@ -41,6 +49,8 @@ def check_production_readiness(settings: Settings) -> ProductionReadinessResult:
         blockers=blockers,
         decisions={
             "payment_rail": settings.payment_rail,
+            "outbound_payment_rail": settings.outbound_payment_rail,
+            "outbound_payment_provider": settings.outbound_payment_provider or "unconfigured",
             "secret_backend": settings.secret_backend,
             "hosting_environment": settings.hosting_environment,
             "database": "external" if not settings.database_url.startswith("sqlite") else "sqlite",

@@ -87,6 +87,10 @@ def _production_settings():
         stripe_webhook_secret="whsec_test_value_for_validation",
         stripe_success_url="https://example.com/success",
         stripe_cancel_url="https://example.com/cancel",
+        outbound_payment_rail="bank",
+        outbound_payment_provider="example-business-bank",
+        treasury_account_reference="treasury-account-001",
+        outbound_live_validation_approved=True,
         secret_backend="aws_secrets_manager",
         hosting_environment="container",
         _env_file=None,
@@ -106,8 +110,29 @@ def test_production_readiness_accepts_explicit_production_configuration():
     assert result.ready is True
     assert result.blockers == []
     assert result.decisions["payment_rail"] == "stripe"
+    assert result.decisions["outbound_payment_rail"] == "bank"
+    assert result.decisions["outbound_payment_provider"] == "example-business-bank"
     assert result.decisions["secret_backend"] == "aws_secrets_manager"
     assert result.decisions["hosting_environment"] == "container"
+
+
+def test_production_readiness_blocks_missing_outbound_rail_and_treasury_config():
+    settings = _production_settings().model_copy(
+        update={
+            "outbound_payment_rail": "simulated",
+            "outbound_payment_provider": None,
+            "treasury_account_reference": None,
+            "outbound_live_validation_approved": False,
+        }
+    )
+
+    result = check_production_readiness(settings)
+
+    assert result.ready is False
+    assert "outbound_payment_rail must be a configured production rail" in result.blockers
+    assert "outbound_payment_provider must be configured" in result.blockers
+    assert "treasury_account_reference must be configured" in result.blockers
+    assert "outbound live validation must be operator-approved" in result.blockers
 
 
 def test_production_readiness_endpoint_returns_ready_state_for_operator():

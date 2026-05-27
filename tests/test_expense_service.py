@@ -6,6 +6,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
 from ryan.db import Base, create_database_engine
+from ryan.expenses.provider import OutboundPaymentResult
 from ryan.expenses.service import create_expense_request
 from ryan.models import ExceptionRecord, ExpenseRequest, LedgerEntry, PolicyRule, Wallet
 from ryan.policy import create_policy_rule
@@ -143,6 +144,28 @@ def _expense_payload(**overrides):
     return payload
 
 
+class RecordingOutboundProvider:
+    name = "recording_bank"
+
+    def __init__(self):
+        self.requests = []
+
+    def submit_payment(self, request):
+        self.requests.append(request)
+        return OutboundPaymentResult(
+            provider_name=self.name,
+            provider_reference="bank-payment-001",
+            status="submitted",
+        )
+
+
+class FailingOutboundProvider:
+    name = "failing_bank"
+
+    def submit_payment(self, request):
+        raise RuntimeError("outbound rail unavailable")
+
+
 def test_approved_expense_executes_from_operating_wallet(sqlite_session):
     wallets = _create_wallets(sqlite_session)
     _create_policy_rules(sqlite_session)
@@ -152,6 +175,9 @@ def test_approved_expense_executes_from_operating_wallet(sqlite_session):
     assert expense.policy_status == "approved"
     assert expense.execution_status == "executed"
     assert expense.source_wallet_id == wallets["operating"].id
+    assert expense.outbound_payment_provider == "simulated_outbound"
+    assert expense.outbound_payment_reference.startswith("simulated-outbound-")
+    assert expense.outbound_payment_status == "submitted"
     assert wallets["operating"].balance == Decimal("90.00")
     assert sqlite_session.scalar(select(ExceptionRecord)) is None
     ledger_types = set(
@@ -164,6 +190,55 @@ def test_approved_expense_executes_from_operating_wallet(sqlite_session):
     )
     assert "audit.expense.requested" in ledger_types
     assert "wallet.expense.debit" in ledger_types
+    outbound_entry = sqlite_session.scalar(
+        select(LedgerEntry).where(LedgerEntry.type == "outbound.payment.submitted")
+    )
+    assert outbound_entry is not None
+    assert outbound_entry.metadata_["payment_provider"] == "simulated_outbound"
+    assert outbound_entry.metadata_["provider_reference"] == expense.outbound_payment_reference
+
+
+def test_approved_expense_submits_to_injected_outbound_provider(sqlite_session):
+    wallets = _create_wallets(sqlite_session)
+    _create_policy_rules(sqlite_session)
+    provider = RecordingOutboundProvider()
+
+    expense = create_expense_request(
+        sqlite_session,
+        **_expense_payload(idempotency_key="expense-with-provider"),
+        outbound_provider=provider,
+    )
+
+    assert expense.execution_status == "executed"
+    assert expense.outbound_payment_provider == "recording_bank"
+    assert expense.outbound_payment_reference == "bank-payment-001"
+    assert wallets["operating"].balance == Decimal("90.00")
+    assert len(provider.requests) == 1
+    request = provider.requests[0]
+    assert request.expense_id == expense.id
+    assert request.vendor == "approved-vendor"
+    assert request.amount == Decimal("10.00")
+    assert request.idempotency_key == "expense-with-provider"
+
+
+def test_outbound_provider_failure_does_not_debit_wallet(sqlite_session):
+    wallets = _create_wallets(sqlite_session)
+    _create_policy_rules(sqlite_session)
+
+    with pytest.raises(RuntimeError, match="outbound rail unavailable"):
+        create_expense_request(
+            sqlite_session,
+            **_expense_payload(idempotency_key="expense-provider-failure"),
+            outbound_provider=FailingOutboundProvider(),
+        )
+
+    assert wallets["operating"].balance == Decimal("100.00")
+    assert (
+        sqlite_session.scalar(
+            select(LedgerEntry).where(LedgerEntry.type == "wallet.expense.debit")
+        )
+        is None
+    )
 
 
 def test_expense_replay_does_not_duplicate_wallet_debit(sqlite_session):

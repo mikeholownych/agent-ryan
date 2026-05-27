@@ -191,6 +191,9 @@ class ExpenseRequest(Base, TimestampMixin):
     )
     source_wallet_id: Mapped[str | None] = mapped_column(ForeignKey("wallets.id"))
     execution_status: Mapped[str] = mapped_column(String(64), nullable=False)
+    outbound_payment_provider: Mapped[str | None] = mapped_column(String(128))
+    outbound_payment_reference: Mapped[str | None] = mapped_column(String(255))
+    outbound_payment_status: Mapped[str | None] = mapped_column(String(64))
     idempotency_key: Mapped[str | None] = mapped_column(String(255))
     created_by_actor: Mapped[str] = mapped_column(String(255), nullable=False)
 

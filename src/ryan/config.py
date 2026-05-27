@@ -191,6 +191,10 @@ _PRODUCTION_REQUIRED_POLICY_FIELDS = {
     "revenue_floor",
     "reserve_minimum",
     "revenue_allocation",
+    "outbound_payment_rail",
+    "outbound_payment_provider",
+    "treasury_account_reference",
+    "outbound_live_validation_approved",
 }
 
 
@@ -241,6 +245,10 @@ class Settings(BaseSettings):
     stripe_webhook_secret: str | None = None
     stripe_success_url: str | None = None
     stripe_cancel_url: str | None = None
+    outbound_payment_rail: Literal["simulated", "bank", "treasury", "bill_pay"] = "simulated"
+    outbound_payment_provider: str | None = None
+    treasury_account_reference: str | None = None
+    outbound_live_validation_approved: bool = False
     secret_backend: Literal["environment", "aws_secrets_manager"] = "environment"
     hosting_environment: Literal["local", "container", "aws_ecs"] = "local"
 
@@ -278,6 +286,18 @@ class Settings(BaseSettings):
             raise ValueError(
                 "production requires Stripe API key, webhook secret, success URL, and cancel URL"
             )
+
+        if self.outbound_payment_rail == "simulated":
+            raise ValueError("production outbound_payment_rail must be bank, treasury, or bill_pay")
+
+        if not self.outbound_payment_provider:
+            raise ValueError("production requires outbound_payment_provider")
+
+        if not self.treasury_account_reference:
+            raise ValueError("production requires treasury_account_reference")
+
+        if not self.outbound_live_validation_approved:
+            raise ValueError("production requires operator-approved outbound live validation")
 
         if self.secret_backend == "environment":
             raise ValueError("production requires external secret_backend")

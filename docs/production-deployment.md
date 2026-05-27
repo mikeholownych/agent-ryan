@@ -7,6 +7,10 @@ Ryan production deployment uses the following explicit defaults:
 - AWS account: `352818908635`.
 - AWS region: `ca-central-1`.
 - Payment rail: Stripe Checkout.
+- Outbound payment rail: a configured production bank, treasury, or bill-pay
+  provider. Simulated outbound execution is not production-ready.
+- Treasury account: a real business banking or treasury account reference
+  configured through the secret backend.
 - Secret backend: AWS Secrets Manager.
 - Hosting mode: container runtime, with AWS ECS acceptable as the managed target.
 - Database: external transactional database, not SQLite.
@@ -26,9 +30,17 @@ RYAN_STRIPE_API_KEY=...
 RYAN_STRIPE_WEBHOOK_SECRET=...
 RYAN_STRIPE_SUCCESS_URL=https://your-domain.example/success
 RYAN_STRIPE_CANCEL_URL=https://your-domain.example/cancel
+RYAN_OUTBOUND_PAYMENT_RAIL=bank
+RYAN_OUTBOUND_PAYMENT_PROVIDER=...
+RYAN_TREASURY_ACCOUNT_REFERENCE=...
+RYAN_OUTBOUND_LIVE_VALIDATION_APPROVED=true
 RYAN_SECRET_BACKEND=aws_secrets_manager
 RYAN_HOSTING_ENVIRONMENT=container
 ```
+
+Set `RYAN_OUTBOUND_LIVE_VALIDATION_APPROVED=true` only after the operator has
+approved the selected outbound provider and completed live validation. Until
+then, production readiness must fail closed.
 
 All production policy fields must also be explicit:
 
@@ -93,6 +105,10 @@ Production readiness requires:
 - production environment,
 - non-SQLite database URL,
 - Stripe payment rail with API key, webhook secret, success URL, and cancel URL,
+- outbound payment rail set to `bank`, `treasury`, or `bill_pay`,
+- outbound payment provider configured,
+- treasury account reference configured,
+- operator-approved outbound live validation,
 - AWS Secrets Manager selected as secret backend,
 - container or AWS ECS hosting mode,
 - operator and agent API keys,
@@ -107,6 +123,10 @@ dependency:
 
 - real Stripe credentials and webhook endpoint configured for the production
   account,
+- real outbound payment provider configured for approved vendor payments,
+- real business banking or treasury account reference configured for custody
+  and outbound movement,
+- outbound vendor payment validation completed and approved by the operator,
 - production operator and agent API keys stored outside the repository,
 - AWS Secrets Manager entries created and readable by the runtime identity,
 - external transactional database provisioned, migrated, and reachable,
@@ -163,6 +183,12 @@ The live Stripe Checkout Session creation path has been validated without
 completing a paid Checkout. A paid live Checkout completion and resulting Stripe
 webhook settlement remain operator-gated because they create live financial
 activity.
+
+The current AWS runtime predates the production outbound rail readiness gate.
+Until a real outbound provider, treasury account reference, and operator-
+approved outbound live validation are provisioned and injected into the running
+service, Ryan must not be treated as fully production-ready for closed-loop
+business operation.
 
 ## First Post-Deployment Task
 

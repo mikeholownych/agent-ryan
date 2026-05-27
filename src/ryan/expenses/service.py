@@ -6,6 +6,11 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from ryan.exceptions import create_exception_record
+from ryan.expenses.provider import (
+    OutboundPaymentProvider,
+    OutboundPaymentRequest,
+    SimulatedOutboundPaymentProvider,
+)
 from ryan.idempotency import IdempotencyResponseReference, run_idempotent
 from ryan.ledger import append_ledger_entry
 from ryan.models import ExpenseRequest, PolicyDecision, Wallet
@@ -31,6 +36,7 @@ def create_expense_request(
     idempotency_key: str,
     timestamp: datetime | None = None,
     irreversible: bool = False,
+    outbound_provider: OutboundPaymentProvider | None = None,
 ) -> ExpenseRequest:
     payload = {
         "vendor": vendor,
@@ -57,6 +63,7 @@ def create_expense_request(
             idempotency_key=idempotency_key,
             timestamp=timestamp,
             irreversible=irreversible,
+            outbound_provider=outbound_provider,
         ),
     )
     expense = session.get(ExpenseRequest, response.response_reference_id)
@@ -77,6 +84,7 @@ def _create_expense_once(
     idempotency_key: str,
     timestamp: datetime | None,
     irreversible: bool,
+    outbound_provider: OutboundPaymentProvider | None,
 ) -> IdempotencyResponseReference:
     operating_wallet = _operating_wallet(session, currency)
     if operating_wallet is None:
@@ -135,6 +143,7 @@ def _create_expense_once(
         operating_wallet=operating_wallet,
         actor=actor,
         timestamp=timestamp,
+        outbound_provider=outbound_provider,
     )
     session.flush()
     return IdempotencyResponseReference(
@@ -151,6 +160,7 @@ def _apply_policy_decision(
     operating_wallet: Wallet,
     actor: str,
     timestamp: datetime | None,
+    outbound_provider: OutboundPaymentProvider | None,
 ) -> None:
     if decision.decision == "approve":
         _execute_approved_expense(
@@ -159,6 +169,7 @@ def _apply_policy_decision(
             operating_wallet=operating_wallet,
             actor=actor,
             timestamp=timestamp,
+            outbound_provider=outbound_provider,
         )
         return
     if decision.decision == "escalate":
@@ -193,13 +204,46 @@ def _execute_approved_expense(
     operating_wallet: Wallet,
     actor: str,
     timestamp: datetime | None,
+    outbound_provider: OutboundPaymentProvider | None,
 ) -> None:
     if operating_wallet.balance < expense.amount:
         raise ExpenseRequestError("operating wallet has insufficient funds")
+    provider = outbound_provider or SimulatedOutboundPaymentProvider()
+    provider_result = provider.submit_payment(
+        OutboundPaymentRequest(
+            expense_id=expense.id,
+            vendor=expense.vendor,
+            category=expense.category,
+            amount=expense.amount,
+            currency=expense.currency,
+            rationale=expense.rationale,
+            idempotency_key=expense.idempotency_key or expense.id,
+        )
+    )
     operating_wallet.balance -= expense.amount
     expense.policy_status = "approved"
     expense.execution_status = "executed"
+    expense.outbound_payment_provider = provider_result.provider_name
+    expense.outbound_payment_reference = provider_result.provider_reference
+    expense.outbound_payment_status = provider_result.status
     session.flush()
+    append_ledger_entry(
+        session,
+        type="outbound.payment.submitted",
+        amount=-expense.amount,
+        currency=expense.currency,
+        reference_type="expense",
+        reference_id=expense.id,
+        actor=actor,
+        metadata={
+            "payment_provider": provider_result.provider_name,
+            "provider_reference": provider_result.provider_reference,
+            "provider_status": provider_result.status,
+            "vendor": expense.vendor,
+            "category": expense.category,
+        },
+        timestamp=timestamp,
+    )
     append_ledger_entry(
         session,
         type="wallet.expense.debit",
@@ -213,6 +257,8 @@ def _execute_approved_expense(
             "policy_decision_id": expense.policy_decision_id,
             "vendor": expense.vendor,
             "category": expense.category,
+            "outbound_payment_provider": provider_result.provider_name,
+            "outbound_payment_reference": provider_result.provider_reference,
         },
         timestamp=timestamp,
     )

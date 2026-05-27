@@ -75,6 +75,14 @@ Secrets were created without committing or printing secret values:
 - `ryan/prod/reserve-minimum`
 - `ryan/prod/revenue-allocation`
 
+The following production readiness secrets are now required by the code but
+have not yet been provisioned in the documented AWS runtime:
+
+- `ryan/prod/outbound-payment-rail`
+- `ryan/prod/outbound-payment-provider`
+- `ryan/prod/treasury-account-reference`
+- `ryan/prod/outbound-live-validation-approved`
+
 ### IAM
 
 - ECS execution role: `arn:aws:iam::352818908635:role/ryan-prod-ecs-execution-role`
@@ -175,7 +183,8 @@ Spaceship to delegate `agentryan.blog` to Route 53.
 - Unauthenticated `/api/production/readiness` returned `401`.
 - Wrong-key `/api/production/readiness` returned `401`.
 - Operator-authenticated `/api/production/readiness` returned `200` with
-  `ready=true` and no blockers.
+  `ready=true` and no blockers before the outbound rail and treasury readiness
+  gates were added.
 - Agent-authenticated `/api/status` returned `200`.
 - Agent access to `/api/operator/console` returned `403`.
 - Operator access to `/api/operator/console` returned `200`.
@@ -194,11 +203,15 @@ Spaceship to delegate `agentryan.blog` to Route 53.
 
 ## Remaining Operator-Gated Validation
 
-The live service is operational and protected. The only remaining validation
-that was not executed is a real paid Checkout completion and resulting live
-Stripe webhook settlement. That step requires explicit operator approval for
-the payment amount and payment method because it creates live financial
-activity.
+The live service is operational and protected, but it is not complete as a
+closed-loop production business OS until these operator-gated validations are
+finished:
+
+- provision a real outbound payment rail for approved vendor payments,
+- provision a real business banking or treasury account reference for custody
+  and outbound movement,
+- complete operator-approved outbound live validation,
+- complete a real paid Checkout and resulting live Stripe webhook settlement.
 
 Until that approval is supplied and the payment is completed, customer-facing
 payment capture should remain operator-gated. The Stripe production credential,
