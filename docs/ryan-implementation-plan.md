@@ -1152,6 +1152,9 @@ Daily P&L and operations report must include:
 - Revenue received.
 - Payments confirmed and settled.
 - Expenses approved and executed.
+- Net profit for the period.
+- Retained surplus across revenue, operating, and reserve wallets.
+- Profit trend across generated daily reports.
 - Wallet balances by wallet.
 - Allocation summary.
 - Exceptions opened and resolved.

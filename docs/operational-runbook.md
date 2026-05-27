@@ -138,6 +138,9 @@ Report summary includes:
 
 - settled customer revenue,
 - executed expenses,
+- net profit,
+- retained surplus across revenue, operating, and reserve wallets,
+- profit trend over generated daily reports,
 - wallet balances and locks,
 - allocation summary,
 - exception counts,
@@ -148,8 +151,11 @@ Reconciliation steps:
 
 1. Compare `revenue_total` with settled customer payments.
 2. Compare `expense_total` with executed expense requests.
-3. Compare wallet balances with settlement credits, allocation entries, transfers, and expense debits.
-4. Review open exceptions before approving the daily state.
+3. Verify `profit_total` equals settled revenue minus executed expenses.
+4. Verify `retained_surplus_total` equals revenue, operating, and reserve wallet balances.
+5. Review `profit_trend` for deterioration before approving additional spend.
+6. Compare wallet balances with settlement credits, allocation entries, transfers, and expense debits.
+7. Review open exceptions before approving the daily state.
 
 ## Credential Rotation
 

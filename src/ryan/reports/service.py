@@ -56,9 +56,15 @@ def _build_daily_summary(
     period_start: datetime,
     period_end: datetime,
 ) -> dict:
+    revenue_total = _revenue_total(session, period_start, period_end)
+    expense_total = _expense_total(session, period_start, period_end)
+    profit_total = revenue_total - expense_total
     return {
-        "revenue_total": str(_revenue_total(session, period_start, period_end)),
-        "expense_total": str(_expense_total(session, period_start, period_end)),
+        "revenue_total": str(revenue_total),
+        "expense_total": str(expense_total),
+        "profit_total": str(profit_total),
+        "retained_surplus_total": str(_retained_surplus_total(session)),
+        "profit_trend": _profit_trend(session, period_start, profit_total),
         "wallet_balances": _wallet_balances(session),
         "wallet_locks": _wallet_locks(session),
         "allocation_summary": _allocation_summary(session),
@@ -104,6 +110,43 @@ def _wallet_balances(session: Session) -> dict[str, str]:
         wallet.type: str(wallet.balance)
         for wallet in session.scalars(select(Wallet).order_by(Wallet.type.asc()))
     }
+
+
+def _retained_surplus_total(session: Session) -> Decimal:
+    return sum(
+        (wallet.balance for wallet in session.scalars(select(Wallet))),
+        Decimal("0.00"),
+    )
+
+
+def _profit_trend(
+    session: Session,
+    period_start: datetime,
+    current_profit_total: Decimal,
+) -> list[dict[str, str]]:
+    previous_points = [
+        {
+            "date": report.period_start.date().isoformat(),
+            "profit_total": str(report.summary["profit_total"]),
+        }
+        for report in session.scalars(
+            select(Report)
+            .where(
+                Report.type == "daily",
+                Report.status == "generated",
+                Report.period_start < period_start,
+            )
+            .order_by(Report.period_start.asc())
+        )
+        if "profit_total" in report.summary
+    ]
+    return [
+        *previous_points,
+        {
+            "date": period_start.date().isoformat(),
+            "profit_total": str(current_profit_total),
+        },
+    ]
 
 
 def _wallet_locks(session: Session) -> dict[str, bool]:

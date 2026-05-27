@@ -40,7 +40,7 @@ def _seed_report_data(session):
     )
     operating_wallet = Wallet(
         type="operating",
-        balance=Decimal("60.00"),
+        balance=Decimal("50.00"),
         currency="USD",
         locked=False,
         limits={},
@@ -135,6 +135,8 @@ def test_generate_daily_report_persists_financial_and_operational_summary(
     assert report.status == "generated"
     assert report.summary["revenue_total"] == "100.00"
     assert report.summary["expense_total"] == "10.00"
+    assert report.summary["profit_total"] == "90.00"
+    assert report.summary["retained_surplus_total"] == "90.00"
     assert report.summary["wallet_balances"]["revenue"] == "20.00"
     assert report.summary["wallet_balances"]["reserve"] == "20.00"
     assert report.summary["wallet_locks"]["reserve"] is True
@@ -143,3 +145,27 @@ def test_generate_daily_report_persists_financial_and_operational_summary(
     assert report.summary["policy_decisions"]["approve"] == 1
     assert report.summary["notable_events"] == ["audit.wallet.freeze"]
     assert sqlite_session.get(Report, report.id) is not None
+
+
+def test_daily_report_includes_profit_trend_over_time(sqlite_session):
+    _seed_report_data(sqlite_session)
+    previous_report = Report(
+        type="daily",
+        period_start=datetime(2026, 5, 24, 0, 0, tzinfo=UTC),
+        period_end=datetime(2026, 5, 25, 0, 0, tzinfo=UTC),
+        status="generated",
+        summary={"profit_total": "60.00"},
+    )
+    sqlite_session.add(previous_report)
+    sqlite_session.flush()
+
+    report = generate_daily_report(
+        sqlite_session,
+        report_date=datetime(2026, 5, 25, tzinfo=UTC).date(),
+        actor="system:report",
+    )
+
+    assert report.summary["profit_trend"] == [
+        {"date": "2026-05-24", "profit_total": "60.00"},
+        {"date": "2026-05-25", "profit_total": "90.00"},
+    ]

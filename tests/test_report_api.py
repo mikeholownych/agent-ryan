@@ -73,5 +73,10 @@ def test_daily_report_api_generates_and_returns_report(tmp_path):
     assert response.json()["type"] == "daily"
     assert response.json()["status"] == "generated"
     assert response.json()["summary"]["revenue_total"] == "100.00"
+    assert response.json()["summary"]["profit_total"] == "100.00"
+    assert response.json()["summary"]["retained_surplus_total"] == "175.00"
+    assert response.json()["summary"]["profit_trend"] == [
+        {"date": "2026-05-25", "profit_total": "100.00"}
+    ]
     assert response.json()["summary"]["wallet_balances"]["operating"] == "50.00"
     session.close()
