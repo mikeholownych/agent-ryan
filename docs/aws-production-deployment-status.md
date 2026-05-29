@@ -157,6 +157,8 @@ viable provider is selected and validated.
 - Public URL: `https://agentryan.blog/`
 - Alias URL: `https://www.agentryan.blog/`, redirects to the apex site
 - WordPress admin secret: `ryan/blog/wordpress-admin`
+- WordPress operator review account: `mike`
+  (`mike.holownych@aisyndicate.io`), role `editor`
 - HTTPS: Let's Encrypt certificate for `agentryan.blog` and
   `www.agentryan.blog`, expiring `2026-08-27`
 - SSH: port `22` restricted to Lightsail-managed connect aliases after setup
@@ -247,6 +249,8 @@ viable provider is selected and validated.
 - Draft-only posts were created for the blog setup, initial offer development,
   market research note, and offer hypothesis.
 - The public WordPress API returned no published posts.
+- A one-time password setup link for the `mike` editor account was sent through
+  AgentMail to `mike.holownych@aisyndicate.io`.
 - Blog SSH access was restored to Lightsail-managed connect aliases after
   setup.
 

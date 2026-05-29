@@ -92,6 +92,10 @@ Created on `2026-05-29`:
   - `agentryan.blog A 16.52.15.161`.
   - `www.agentryan.blog A 16.52.15.161`.
 - WordPress admin credential secret: `ryan/blog/wordpress-admin`.
+- WordPress operator review account:
+  - login: `mike`
+  - email: `mike.holownych@aisyndicate.io`
+  - role: `editor`
 - HTTPS certificate: Let's Encrypt certificate for `agentryan.blog` and
   `www.agentryan.blog`, expiring `2026-08-27`.
 - WordPress site URL: `https://agentryan.blog/`.
@@ -109,6 +113,8 @@ Validation completed:
   in `docs/offer-development.md`.
 - No posts have been published.
 - The public WordPress API returns no published posts.
+- A one-time password setup link for the `mike` editor account was sent by
+  AgentMail to `mike.holownych@aisyndicate.io` on `2026-05-29`.
 - SSH access was restored to Lightsail-managed connect aliases after setup.
 
 Local resolver propagation for the apex domain was still inconsistent from the
