@@ -112,6 +112,10 @@ Validation completed:
 - Unused preinstalled plugins and inactive themes were removed.
 - A custom public theme was deployed and activated so the blog no longer uses
   the default WordPress theme.
+- Playwright desktop and mobile checks verified that the custom stylesheet is
+  loaded, the `ryan-operating-log` theme class is present, the Ryan mark
+  renders, the desktop layout uses the intended two-column operating-log shell,
+  the mobile layout stacks correctly, and the ledger-paper post band renders.
 - Published posts are tracked in `docs/offer-development.md`.
 - A one-time password setup link for the `mike` editor account was sent by
   AgentMail to `mike.holownych@aisyndicate.io` on `2026-05-29`.

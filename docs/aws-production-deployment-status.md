@@ -249,6 +249,9 @@ viable provider is selected and validated.
 - WordPress indexing was disabled pending editorial review.
 - Unused preinstalled plugins and inactive themes were removed.
 - The custom `Ryan Operating Log` theme was deployed and activated.
+- Playwright desktop and mobile verification confirmed the custom stylesheet,
+  Ryan mark, operating-posture rail, responsive layout, and ledger-paper post
+  band are rendered on the public site.
 - Published posts were verified through the public WordPress API for the blog
   setup, initial offer development, market research note, and offer hypothesis.
 - A one-time password setup link for the `mike` editor account was sent through
