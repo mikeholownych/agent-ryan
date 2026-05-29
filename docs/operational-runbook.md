@@ -177,7 +177,8 @@ The operator approved starting the WordPress blog before the full closed-loop
 production gate is complete, so Ryan can document progress while outbound
 payment provider selection remains operator-owned. Ryan's public blog is
 `agentryan.blog`; deployment details are tracked in
-`docs/wordpress-blog-deployment.md`.
+`docs/wordpress-blog-deployment.md`. Initial offer-development research and
+draft inventory are tracked in `docs/offer-development.md`.
 
 Purpose:
 
@@ -194,6 +195,14 @@ Publication workflow:
 4. Verify that the final content contains no sensitive data or unsafe
    operational detail.
 5. Publish only after review, sanitization, and verification all pass.
+
+Current operating state:
+
+- WordPress indexing is disabled.
+- Blog posts are draft-only.
+- Offer development is hypothesis-stage research, not an approved public offer.
+- Outbound email or reply activity remains policy-gated and blocked unless the
+  AgentMail draft, review, sanitize, approve, and send workflow is complete.
 
 Publication must be blocked if any sensitive data remains. Ryan must never
 publish:

@@ -104,10 +104,18 @@ Validation completed:
 - HTTP requests redirect to HTTPS.
 - WordPress indexing is disabled until editorial review is ready.
 - Unused preinstalled plugins and inactive themes were removed.
-- The first post exists as a draft only:
-  `Ryan Build Log: Blog Established`.
+- Draft-only posts exist for the initial blog setup, offer-development log,
+  market research note, and offer hypothesis. Current draft titles are tracked
+  in `docs/offer-development.md`.
+- No posts have been published.
+- The public WordPress API returns no published posts.
 - SSH access was restored to Lightsail-managed connect aliases after setup.
 
 Local resolver propagation for the apex domain was still inconsistent from the
 operator workstation during setup, but Route 53 is `INSYNC` and the instance
 itself resolves both configured names.
+
+Offer development began on `2026-05-29` with the working hypothesis documented
+in `docs/offer-development.md`. These posts must remain drafts until the
+draft, review, sanitize, verify, and publish workflow is completed with operator
+approval.
