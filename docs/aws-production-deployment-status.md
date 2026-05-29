@@ -128,6 +128,11 @@ Spaceship to delegate `agentryan.blog` to Route 53.
 
 - API hostname: `api.agentryan.blog`
 - API DNS record: Route 53 alias `A` record to `ryan-prod-alb-702663567.ca-central-1.elb.amazonaws.com`
+- Blog hostname: `agentryan.blog`
+- Blog DNS record: Route 53 `A` record to Lightsail static IP `16.52.15.161`
+- Blog alias hostname: `www.agentryan.blog`
+- Blog alias DNS record: Route 53 `A` record to Lightsail static IP
+  `16.52.15.161`
 - ACM certificate: `arn:aws:acm:ca-central-1:352818908635:certificate/f36c7668-df33-4044-b05d-d534e55d4a96`
 - Certificate status: `ISSUED`
 - ALB HTTPS listener: `443`
@@ -137,6 +142,24 @@ Spaceship to delegate `agentryan.blog` to Route 53.
 
 - CloudWatch log group: `/ecs/ryan-prod`
 - Retention: `30` days
+
+### WordPress Blog
+
+The operator approved setting up the blog before the full closed-loop
+production gate is complete. Outbound payments remain operator-handled until a
+viable provider is selected and validated.
+
+- Lightsail instance: `ryan-blog-wordpress`
+- Region: `ca-central-1`
+- Blueprint: `wordpress_ls_1_0`
+- Bundle: `nano_3_0`
+- Static IP: `ryan-blog-ip`, `16.52.15.161`
+- Public URL: `https://agentryan.blog/`
+- Alias URL: `https://www.agentryan.blog/`, redirects to the apex site
+- WordPress admin secret: `ryan/blog/wordpress-admin`
+- HTTPS: Let's Encrypt certificate for `agentryan.blog` and
+  `www.agentryan.blog`, expiring `2026-08-27`
+- SSH: port `22` restricted to Lightsail-managed connect aliases after setup
 
 ## Validation Completed
 
@@ -152,6 +175,8 @@ Spaceship to delegate `agentryan.blog` to Route 53.
 - Migration logs show PostgreSQL backend and upgrade to `5d79256e586a`.
 - Public DNS delegation for `agentryan.blog` resolves to the Route 53 name servers.
 - `api.agentryan.blog` resolves to the Ryan ALB.
+- `agentryan.blog` and `www.agentryan.blog` Route 53 records point to the
+  Lightsail blog static IP.
 - HTTP requests to `api.agentryan.blog` redirect to HTTPS.
 - HTTPS reaches the Ryan ALB.
 - Ryan code now includes a Stripe-signed webhook endpoint at
@@ -204,6 +229,22 @@ Spaceship to delegate `agentryan.blog` to Route 53.
   - missing policy input rejected fail-closed.
 - CloudWatch logs were scanned for obvious secret markers; no secret material
   was detected.
+- The WordPress blog was created on Lightsail and configured as a public
+  documentation surface.
+- WordPress admin credentials were rotated and stored in Secrets Manager under
+  `ryan/blog/wordpress-admin`.
+- WordPress site URL was set to `https://agentryan.blog/`.
+- Let's Encrypt HTTPS was installed for `agentryan.blog` and
+  `www.agentryan.blog`.
+- `https://agentryan.blog/` returned `200` when resolved to the Lightsail
+  static IP.
+- `https://www.agentryan.blog/` redirected to `https://agentryan.blog/`.
+- HTTP requests to the blog redirect to HTTPS.
+- WordPress indexing was disabled pending editorial review.
+- Unused preinstalled plugins and inactive themes were removed.
+- A draft-only first post, `Ryan Build Log: Blog Established`, was created.
+- Blog SSH access was restored to Lightsail-managed connect aliases after
+  setup.
 
 ## Remaining Operator-Gated Validation
 

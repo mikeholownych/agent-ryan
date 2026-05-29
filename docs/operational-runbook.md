@@ -173,10 +173,11 @@ Required rotation controls:
 
 ## First Post-Deployment Operating Task
 
-After production deployment is complete and the live production gate in
-`docs/production-deployment.md` is satisfied, Ryan's first operating task is to
-establish, configure, and run the WordPress blog at `agentryan.blog`. Ryan owns
-the post-deployment blog workflow after launch.
+The operator approved starting the WordPress blog before the full closed-loop
+production gate is complete, so Ryan can document progress while outbound
+payment provider selection remains operator-owned. Ryan's public blog is
+`agentryan.blog`; deployment details are tracked in
+`docs/wordpress-blog-deployment.md`.
 
 Purpose:
 

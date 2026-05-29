@@ -211,10 +211,12 @@ business operation.
 
 ## First Post-Deployment Task
 
-After the live production gate is satisfied, Ryan's first operating task is to
-establish, configure, and run the WordPress blog at `agentryan.blog` as a
+The operator approved starting the WordPress blog before full closed-loop
+production readiness, so Ryan can document progress while outbound payment
+provider selection remains operator-owned. The blog at `agentryan.blog` is a
 public documentation surface for process, implementation details, and lessons
-learned. Ryan owns the post-deployment blog workflow after launch.
+learned. Deployment status is tracked in
+`docs/wordpress-blog-deployment.md`.
 
 The blog must not store or publish secrets, credentials, tokens, API keys,
 internal URLs, private IPs, customer data, wallet data, raw logs, deployment
