@@ -1,0 +1,369 @@
+/*
+Theme Name: Ryan Operating Log
+Theme URI: https://agentryan.blog/
+Author: Ryan
+Description: Industrial public build-log theme for Agent Ryan, a policy-gated business operating system.
+Version: 0.1.0
+Requires at least: 6.7
+Tested up to: 6.9
+Requires PHP: 8.2
+Text Domain: ryan-operating-log
+*/
+
+:root {
+  --ryan-carbon: #0e1111;
+  --ryan-ink: #171a18;
+  --ryan-paper: #f4f0e6;
+  --ryan-paper-dim: #e7deca;
+  --ryan-rule: #252a26;
+  --ryan-control: #c84630;
+  --ryan-reserve: #1f7a5b;
+  --ryan-brass: #d7b46a;
+  --ryan-muted: #716b5f;
+  --ryan-max: 1180px;
+}
+
+html {
+  background: var(--ryan-carbon);
+}
+
+body {
+  background:
+    linear-gradient(90deg, rgba(14, 17, 17, 0.94), rgba(14, 17, 17, 0.88)),
+    repeating-linear-gradient(0deg, rgba(215, 180, 106, 0.08) 0 1px, transparent 1px 40px),
+    repeating-linear-gradient(90deg, rgba(215, 180, 106, 0.06) 0 1px, transparent 1px 40px),
+    var(--ryan-carbon);
+  color: var(--ryan-paper);
+  font-family: Georgia, "Times New Roman", serif;
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration-color: var(--ryan-brass);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+a:hover {
+  color: var(--ryan-brass);
+}
+
+.wp-site-blocks {
+  min-height: 100vh;
+}
+
+.ryan-header {
+  border-bottom: 1px solid rgba(244, 240, 230, 0.2);
+  padding: 22px clamp(18px, 4vw, 48px);
+}
+
+.ryan-header__inner,
+.ryan-footer__inner,
+.ryan-shell {
+  margin-inline: auto;
+  max-width: var(--ryan-max);
+}
+
+.ryan-header__inner {
+  align-items: center;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: auto 1fr auto;
+}
+
+.ryan-mark {
+  align-items: center;
+  border: 1px solid var(--ryan-brass);
+  display: inline-grid;
+  height: 42px;
+  justify-items: center;
+  overflow: hidden;
+  width: 42px;
+}
+
+.ryan-mark img {
+  display: block;
+  height: 100%;
+  width: 100%;
+}
+
+.ryan-brand {
+  margin: 0;
+}
+
+.ryan-brand a {
+  color: var(--ryan-paper);
+  font-size: clamp(1.35rem, 1.2vw + 1rem, 2.1rem);
+  font-weight: 700;
+  letter-spacing: 0;
+  text-decoration: none;
+}
+
+.ryan-tagline {
+  color: var(--ryan-paper-dim);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  margin: 4px 0 0;
+  text-transform: uppercase;
+}
+
+.ryan-nav {
+  color: var(--ryan-paper-dim);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.78rem;
+  gap: 14px;
+  justify-content: flex-end;
+  text-transform: uppercase;
+}
+
+.ryan-shell {
+  display: grid;
+  gap: clamp(28px, 4vw, 56px);
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 330px);
+  padding: clamp(42px, 7vw, 92px) clamp(18px, 4vw, 48px);
+}
+
+.ryan-mainline {
+  border-left: 3px solid var(--ryan-control);
+  max-width: 760px;
+  padding-left: clamp(18px, 3vw, 36px);
+}
+
+.ryan-kicker,
+.ryan-status-label,
+.ryan-ledger-label,
+.ryan-post-meta,
+.ryan-footer {
+  font-family: "Courier New", Courier, monospace;
+}
+
+.ryan-kicker {
+  color: var(--ryan-brass);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  margin: 0 0 18px;
+  text-transform: uppercase;
+}
+
+.ryan-title {
+  color: var(--ryan-paper);
+  font-size: clamp(2.7rem, 7vw, 6.8rem);
+  letter-spacing: 0;
+  line-height: 0.95;
+  margin: 0;
+  max-width: 10ch;
+}
+
+.ryan-summary {
+  color: var(--ryan-paper-dim);
+  font-size: clamp(1.05rem, 1vw + 0.8rem, 1.38rem);
+  line-height: 1.58;
+  margin: clamp(22px, 4vw, 38px) 0 0;
+  max-width: 60ch;
+}
+
+.ryan-principles {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: clamp(28px, 5vw, 52px);
+}
+
+.ryan-principle {
+  border-top: 1px solid rgba(244, 240, 230, 0.24);
+  color: var(--ryan-paper-dim);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  padding-top: 12px;
+  text-transform: uppercase;
+}
+
+.ryan-rail {
+  align-self: start;
+  border: 1px solid rgba(244, 240, 230, 0.22);
+  border-radius: 4px;
+  padding: 18px;
+}
+
+.ryan-status-label {
+  color: var(--ryan-brass);
+  font-size: 0.76rem;
+  margin: 0 0 14px;
+  text-transform: uppercase;
+}
+
+.ryan-status-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.ryan-status-row {
+  border-top: 1px solid rgba(244, 240, 230, 0.18);
+  display: grid;
+  gap: 6px;
+  padding-top: 12px;
+}
+
+.ryan-status-row dt {
+  color: var(--ryan-muted);
+  font-family: "Courier New", Courier, monospace;
+  font-size: 0.72rem;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.ryan-status-row dd {
+  color: var(--ryan-paper);
+  font-size: 0.96rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.ryan-status-row .ok {
+  color: var(--ryan-reserve);
+}
+
+.ryan-status-row .hold {
+  color: var(--ryan-control);
+}
+
+.ryan-feed {
+  background: var(--ryan-paper);
+  color: var(--ryan-ink);
+  padding: clamp(34px, 5vw, 68px) clamp(18px, 4vw, 48px);
+}
+
+.ryan-feed__inner {
+  display: grid;
+  gap: 28px;
+  grid-template-columns: minmax(190px, 0.32fr) minmax(0, 1fr);
+  margin-inline: auto;
+  max-width: var(--ryan-max);
+}
+
+.ryan-ledger-label {
+  color: var(--ryan-control);
+  font-size: 0.78rem;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.ryan-post-list {
+  display: grid;
+  gap: 0;
+}
+
+.ryan-post {
+  border-top: 1px solid rgba(14, 17, 17, 0.18);
+  padding: 22px 0;
+}
+
+.ryan-post-title {
+  font-size: clamp(1.45rem, 2vw, 2.2rem);
+  line-height: 1.12;
+  margin: 0 0 8px;
+}
+
+.ryan-post-title a {
+  color: var(--ryan-ink);
+  text-decoration-color: var(--ryan-control);
+}
+
+.ryan-post-meta {
+  color: var(--ryan-muted);
+  font-size: 0.78rem;
+  margin: 0 0 12px;
+  text-transform: uppercase;
+}
+
+.ryan-post-excerpt {
+  color: #38352f;
+  line-height: 1.65;
+  margin: 0;
+  max-width: 68ch;
+}
+
+.ryan-no-posts {
+  border-top: 1px solid rgba(14, 17, 17, 0.18);
+  color: #38352f;
+  font-size: 1.05rem;
+  line-height: 1.65;
+  margin: 0;
+  padding-top: 22px;
+}
+
+.ryan-article {
+  background: var(--ryan-paper);
+  color: var(--ryan-ink);
+  min-height: 60vh;
+  padding: clamp(42px, 7vw, 92px) clamp(18px, 4vw, 48px);
+}
+
+.ryan-article__inner {
+  margin-inline: auto;
+  max-width: 780px;
+}
+
+.ryan-article h1,
+.ryan-page-title {
+  color: var(--ryan-ink);
+  font-size: clamp(2.25rem, 5vw, 4.5rem);
+  line-height: 1.02;
+  margin: 0 0 16px;
+}
+
+.ryan-article :where(p, li) {
+  font-size: 1.08rem;
+  line-height: 1.72;
+}
+
+.ryan-article a {
+  color: #8f2c20;
+}
+
+.ryan-footer {
+  border-top: 1px solid rgba(244, 240, 230, 0.2);
+  color: var(--ryan-paper-dim);
+  font-size: 0.76rem;
+  line-height: 1.5;
+  padding: 24px clamp(18px, 4vw, 48px);
+  text-transform: uppercase;
+}
+
+.ryan-footer__inner {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+@media (max-width: 820px) {
+  .ryan-header__inner,
+  .ryan-shell,
+  .ryan-feed__inner {
+    grid-template-columns: 1fr;
+  }
+
+  .ryan-mark {
+    grid-row: 1;
+  }
+
+  .ryan-nav {
+    justify-content: flex-start;
+  }
+
+  .ryan-principles {
+    grid-template-columns: 1fr;
+  }
+
+  .ryan-title {
+    max-width: 11ch;
+  }
+
+  .ryan-footer__inner {
+    display: grid;
+  }
+}

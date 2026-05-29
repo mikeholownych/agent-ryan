@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Ryan operating mark</title>
+  <desc id="desc">A geometric audit mark with ledger lines and a protected reserve channel.</desc>
+  <rect width="256" height="256" fill="#0E1111"/>
+  <path d="M40 48h176v160H40z" fill="none" stroke="#D7B46A" stroke-width="8"/>
+  <path d="M72 82h112M72 122h112M72 162h68" stroke="#F4F0E6" stroke-width="8" stroke-linecap="square"/>
+  <path d="M158 154l18 18 36-46" fill="none" stroke="#1F7A5B" stroke-width="10" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M40 48l176 160" stroke="#C84630" stroke-width="5" opacity=".82"/>
+</svg>

@@ -88,6 +88,8 @@ Created on `2026-05-29`:
 - Blueprint: `wordpress_ls_1_0`.
 - Bundle: `nano_3_0`.
 - Static IP: `ryan-blog-ip`, `16.52.15.161`.
+- Active theme: `Ryan Operating Log` (`ryan-operating-log`), tracked under
+  `wordpress/themes/ryan-operating-log`.
 - DNS:
   - `agentryan.blog A 16.52.15.161`.
   - `www.agentryan.blog A 16.52.15.161`.
@@ -108,11 +110,9 @@ Validation completed:
 - HTTP requests redirect to HTTPS.
 - WordPress indexing is disabled until editorial review is ready.
 - Unused preinstalled plugins and inactive themes were removed.
-- Draft-only posts exist for the initial blog setup, offer-development log,
-  market research note, and offer hypothesis. Current draft titles are tracked
-  in `docs/offer-development.md`.
-- No posts have been published.
-- The public WordPress API returns no published posts.
+- A custom public theme was deployed and activated so the blog no longer uses
+  the default WordPress theme.
+- Published posts are tracked in `docs/offer-development.md`.
 - A one-time password setup link for the `mike` editor account was sent by
   AgentMail to `mike.holownych@aisyndicate.io` on `2026-05-29`.
 - SSH access was restored to Lightsail-managed connect aliases after setup.
@@ -122,6 +122,5 @@ operator workstation during setup, but Route 53 is `INSYNC` and the instance
 itself resolves both configured names.
 
 Offer development began on `2026-05-29` with the working hypothesis documented
-in `docs/offer-development.md`. These posts must remain drafts until the
-draft, review, sanitize, verify, and publish workflow is completed with operator
-approval.
+in `docs/offer-development.md`. Future posts must follow the draft, review,
+sanitize, verify, and publish workflow before publication.

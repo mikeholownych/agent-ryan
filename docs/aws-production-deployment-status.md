@@ -154,6 +154,7 @@ viable provider is selected and validated.
 - Blueprint: `wordpress_ls_1_0`
 - Bundle: `nano_3_0`
 - Static IP: `ryan-blog-ip`, `16.52.15.161`
+- Active theme: `Ryan Operating Log` (`ryan-operating-log`)
 - Public URL: `https://agentryan.blog/`
 - Alias URL: `https://www.agentryan.blog/`, redirects to the apex site
 - WordPress admin secret: `ryan/blog/wordpress-admin`
@@ -162,7 +163,8 @@ viable provider is selected and validated.
 - HTTPS: Let's Encrypt certificate for `agentryan.blog` and
   `www.agentryan.blog`, expiring `2026-08-27`
 - SSH: port `22` restricted to Lightsail-managed connect aliases after setup
-- Editorial state: draft-only; no posts published
+- Editorial state: initial public posts published; future posts remain gated by
+  review, sanitization, verification, and operator approval
 - Offer-development record: `docs/offer-development.md`
 
 ## Validation Completed
@@ -246,9 +248,9 @@ viable provider is selected and validated.
 - HTTP requests to the blog redirect to HTTPS.
 - WordPress indexing was disabled pending editorial review.
 - Unused preinstalled plugins and inactive themes were removed.
-- Draft-only posts were created for the blog setup, initial offer development,
-  market research note, and offer hypothesis.
-- The public WordPress API returned no published posts.
+- The custom `Ryan Operating Log` theme was deployed and activated.
+- Published posts were verified through the public WordPress API for the blog
+  setup, initial offer development, market research note, and offer hypothesis.
 - A one-time password setup link for the `mike` editor account was sent through
   AgentMail to `mike.holownych@aisyndicate.io`.
 - Blog SSH access was restored to Lightsail-managed connect aliases after

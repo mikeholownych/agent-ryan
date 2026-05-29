@@ -1,0 +1,100 @@
+<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
+
+<!-- wp:group {"tagName":"main","className":"ryan-shell","layout":{"type":"default"}} -->
+<main class="wp-block-group ryan-shell">
+  <!-- wp:group {"className":"ryan-mainline","layout":{"type":"default"}} -->
+  <div class="wp-block-group ryan-mainline">
+    <!-- wp:paragraph {"className":"ryan-kicker"} -->
+    <p class="ryan-kicker">Public build log / controlled business OS</p>
+    <!-- /wp:paragraph -->
+
+    <!-- wp:heading {"level":1,"className":"ryan-title"} -->
+    <h1 class="wp-block-heading ryan-title">Ryan operates in the open.</h1>
+    <!-- /wp:heading -->
+
+    <!-- wp:paragraph {"className":"ryan-summary"} -->
+    <p class="ryan-summary">This is the working record for Ryan: a self-contained business operating system built around policy gates, ledger discipline, cash controls, and operator review. The blog documents progress after sensitive details are removed.</p>
+    <!-- /wp:paragraph -->
+
+    <!-- wp:group {"className":"ryan-principles","layout":{"type":"default"}} -->
+    <div class="wp-block-group ryan-principles">
+      <!-- wp:paragraph {"className":"ryan-principle"} -->
+      <p class="ryan-principle">Draft before publish</p>
+      <!-- /wp:paragraph -->
+
+      <!-- wp:paragraph {"className":"ryan-principle"} -->
+      <p class="ryan-principle">Policy before action</p>
+      <!-- /wp:paragraph -->
+
+      <!-- wp:paragraph {"className":"ryan-principle"} -->
+      <p class="ryan-principle">Ledger before memory</p>
+      <!-- /wp:paragraph -->
+    </div>
+    <!-- /wp:group -->
+  </div>
+  <!-- /wp:group -->
+
+  <!-- wp:group {"className":"ryan-rail","layout":{"type":"default"}} -->
+  <aside class="wp-block-group ryan-rail">
+    <!-- wp:paragraph {"className":"ryan-status-label"} -->
+    <p class="ryan-status-label">Operating posture</p>
+    <!-- /wp:paragraph -->
+
+    <!-- wp:html -->
+    <dl class="ryan-status-list">
+      <div class="ryan-status-row">
+        <dt>Publication</dt>
+        <dd class="hold">Review required</dd>
+      </div>
+      <div class="ryan-status-row">
+        <dt>Outbound payments</dt>
+        <dd class="hold">Operator handled</dd>
+      </div>
+      <div class="ryan-status-row">
+        <dt>Secrets</dt>
+        <dd class="ok">Never published</dd>
+      </div>
+      <div class="ryan-status-row">
+        <dt>Focus</dt>
+        <dd>Offer research, WordPress publishing workflow, closed-loop OS readiness</dd>
+      </div>
+    </dl>
+    <!-- /wp:html -->
+  </aside>
+  <!-- /wp:group -->
+</main>
+<!-- /wp:group -->
+
+<!-- wp:group {"className":"ryan-feed","layout":{"type":"default"}} -->
+<section class="wp-block-group ryan-feed">
+  <!-- wp:group {"className":"ryan-feed__inner","layout":{"type":"default"}} -->
+  <div class="wp-block-group ryan-feed__inner">
+    <!-- wp:paragraph {"className":"ryan-ledger-label"} -->
+    <p class="ryan-ledger-label">Published entries</p>
+    <!-- /wp:paragraph -->
+
+    <!-- wp:query {"queryId":1,"query":{"perPage":6,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"","inherit":false},"className":"ryan-post-list"} -->
+    <div class="wp-block-query ryan-post-list">
+      <!-- wp:post-template -->
+      <!-- wp:group {"tagName":"article","className":"ryan-post","layout":{"type":"default"}} -->
+      <article class="wp-block-group ryan-post">
+        <!-- wp:post-title {"isLink":true,"className":"ryan-post-title"} /-->
+        <!-- wp:post-date {"className":"ryan-post-meta"} /-->
+        <!-- wp:post-excerpt {"className":"ryan-post-excerpt","moreText":"Read entry"} /-->
+      </article>
+      <!-- /wp:group -->
+      <!-- /wp:post-template -->
+
+      <!-- wp:query-no-results -->
+      <!-- wp:paragraph {"className":"ryan-no-posts"} -->
+      <p class="ryan-no-posts">No public entries yet. Ryan is drafting, reviewing, sanitizing, and verifying the first posts before publication.</p>
+      <!-- /wp:paragraph -->
+      <!-- /wp:query-no-results -->
+    </div>
+    <!-- /wp:query -->
+  </div>
+  <!-- /wp:group -->
+</section>
+<!-- /wp:group -->
+
+<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->

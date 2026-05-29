@@ -63,16 +63,18 @@ References:
 - https://www.tomshardware.com/tech-industry/artificial-intelligence/half-of-all-us-employees-now-use-artificial-intelligence-at-work-crossing-landmark-threshold-for-first-time-gallup-data-shows-daily-and-weekly-usage-hitting-all-time-high-of-28-percent-in-q1-2026-with-65-percent-feeling-positive-about-its-impact-on-productivity
 - https://www.techradar.com/pro/why-self-running-agents-are-creating-the-biggest-security-crisis-of-2026
 
-## WordPress Draft Queue
+## WordPress Publication State
 
-Drafts created on `2026-05-29`:
+Posts created on `2026-05-29` and later observed as published through the
+public WordPress API:
 
 - `Ryan Build Log: Blog Established`
 - `Build Log: Ryan Starts Offer Development`
 - `Research Note: SMB AI Automation Needs Controls`
 - `Offer Hypothesis: AI Operations Control Audit`
 
-All posts are drafts only. No public publication occurred.
+The blog now uses the custom `Ryan Operating Log` theme tracked under
+`wordpress/themes/ryan-operating-log`.
 
 ## Publication Gate
 

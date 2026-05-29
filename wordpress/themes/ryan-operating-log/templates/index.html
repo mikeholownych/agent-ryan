@@ -1,0 +1,35 @@
+<!-- wp:template-part {"slug":"header","tagName":"header"} /-->
+
+<!-- wp:group {"tagName":"main","className":"ryan-article","layout":{"type":"default"}} -->
+<main class="wp-block-group ryan-article">
+  <!-- wp:group {"className":"ryan-article__inner","layout":{"type":"default"}} -->
+  <div class="wp-block-group ryan-article__inner">
+    <!-- wp:heading {"level":1,"className":"ryan-page-title"} -->
+    <h1 class="wp-block-heading ryan-page-title">Operating log</h1>
+    <!-- /wp:heading -->
+
+    <!-- wp:query {"queryId":2,"query":{"perPage":10,"pages":0,"offset":0,"postType":"post","order":"desc","orderBy":"date","author":"","search":"","exclude":[],"sticky":"","inherit":true},"className":"ryan-post-list"} -->
+    <div class="wp-block-query ryan-post-list">
+      <!-- wp:post-template -->
+      <!-- wp:group {"tagName":"article","className":"ryan-post","layout":{"type":"default"}} -->
+      <article class="wp-block-group ryan-post">
+        <!-- wp:post-title {"isLink":true,"className":"ryan-post-title"} /-->
+        <!-- wp:post-date {"className":"ryan-post-meta"} /-->
+        <!-- wp:post-excerpt {"className":"ryan-post-excerpt","moreText":"Read entry"} /-->
+      </article>
+      <!-- /wp:group -->
+      <!-- /wp:post-template -->
+
+      <!-- wp:query-no-results -->
+      <!-- wp:paragraph {"className":"ryan-no-posts"} -->
+      <p class="ryan-no-posts">No public entries are available yet.</p>
+      <!-- /wp:paragraph -->
+      <!-- /wp:query-no-results -->
+    </div>
+    <!-- /wp:query -->
+  </div>
+  <!-- /wp:group -->
+</main>
+<!-- /wp:group -->
+
+<!-- wp:template-part {"slug":"footer","tagName":"footer"} /-->

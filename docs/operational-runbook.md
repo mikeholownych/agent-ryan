@@ -199,8 +199,11 @@ Publication workflow:
 Current operating state:
 
 - WordPress indexing is disabled.
-- Blog posts are draft-only.
-- Offer development is hypothesis-stage research, not an approved public offer.
+- Initial public build-log and offer-development posts have been published.
+- Future blog posts must still pass draft, review, sanitize, verify, and
+  operator approval before publication.
+- Offer development remains hypothesis-stage research, not an approved
+  unrestricted public offer.
 - Outbound email or reply activity remains policy-gated and blocked unless the
   AgentMail draft, review, sanitize, approve, and send workflow is complete.
 

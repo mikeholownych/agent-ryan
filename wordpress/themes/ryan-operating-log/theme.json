@@ -1,0 +1,103 @@
+{
+  "$schema": "https://schemas.wp.org/trunk/theme.json",
+  "version": 3,
+  "settings": {
+    "appearanceTools": true,
+    "color": {
+      "defaultDuotone": false,
+      "defaultGradients": false,
+      "defaultPalette": false,
+      "palette": [
+        { "slug": "carbon", "color": "#0E1111", "name": "Carbon" },
+        { "slug": "paper", "color": "#F4F0E6", "name": "Ledger Paper" },
+        { "slug": "control", "color": "#C84630", "name": "Control Red" },
+        { "slug": "reserve", "color": "#1F7A5B", "name": "Reserve Green" },
+        { "slug": "brass", "color": "#D7B46A", "name": "Audit Brass" }
+      ]
+    },
+    "layout": {
+      "contentSize": "780px",
+      "wideSize": "1180px"
+    },
+    "spacing": {
+      "spacingScale": {
+        "operator": "*",
+        "increment": 8,
+        "steps": 8,
+        "mediumStep": 24,
+        "unit": "px"
+      },
+      "units": ["px", "rem", "%", "vw", "vh"]
+    },
+    "typography": {
+      "defaultFontSizes": false,
+      "fontFamilies": [
+        {
+          "fontFamily": "Georgia, 'Times New Roman', serif",
+          "name": "Ledger Serif",
+          "slug": "ledger-serif"
+        },
+        {
+          "fontFamily": "'Courier New', Courier, monospace",
+          "name": "Audit Mono",
+          "slug": "audit-mono"
+        }
+      ],
+      "fontSizes": [
+        { "slug": "small", "size": "0.875rem", "name": "Small" },
+        { "slug": "normal", "size": "1rem", "name": "Normal" },
+        { "slug": "large", "size": "1.25rem", "name": "Large" },
+        { "slug": "x-large", "size": "1.75rem", "name": "Extra Large" }
+      ]
+    }
+  },
+  "styles": {
+    "color": {
+      "background": "#0E1111",
+      "text": "#F4F0E6"
+    },
+    "typography": {
+      "fontFamily": "var:preset|font-family|ledger-serif",
+      "lineHeight": "1.6"
+    },
+    "elements": {
+      "button": {
+        "border": {
+          "radius": "4px"
+        },
+        "color": {
+          "background": "#C84630",
+          "text": "#F4F0E6"
+        },
+        "typography": {
+          "fontFamily": "var:preset|font-family|audit-mono",
+          "textTransform": "uppercase"
+        }
+      },
+      "heading": {
+        "typography": {
+          "fontFamily": "var:preset|font-family|ledger-serif",
+          "fontWeight": "700",
+          "letterSpacing": "0"
+        }
+      },
+      "link": {
+        "color": {
+          "text": "#C84630"
+        }
+      }
+    }
+  },
+  "templateParts": [
+    {
+      "area": "header",
+      "name": "header",
+      "title": "Header"
+    },
+    {
+      "area": "footer",
+      "name": "footer",
+      "title": "Footer"
+    }
+  ]
+}
