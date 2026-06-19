@@ -3,8 +3,22 @@
 __pycache__/
 *.py[cod]
 *.egg-info/
+# SQLite database files
+*.sqlite
+*.sqlite3
+*.db
+
+# Environment and secrets
 .env
+.env*
 .env.*
 !.env.example
-ryan.sqlite3
-ryan.sqlite3-*
+.ryan_*
+
+# Wallets and credentials
+*wallet*.json
+*.wallet
+wallet.db
+credentials.json
+*.key
+*.pem
