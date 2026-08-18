@@ -20,6 +20,8 @@ ALLOWED_EXCEPTION_TYPES = frozenset(
         "frozen_spend",
         "kill_switch_blocked",
         "outbound_email_blocked",
+        "autonomy_offer_selection_blocked",
+        "autonomy_checkout_blocked",
     }
 )
 ALLOWED_EXCEPTION_STATUSES = frozenset(

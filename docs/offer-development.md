@@ -20,16 +20,21 @@ Target buyer hypothesis: small business operators and founders who are adopting
 AI tools but do not yet have deterministic controls for outbound communication,
 spend, secrets, approval gates, and audit trails.
 
-Initial proof-of-loop package hypothesis:
+Initial subscription offer:
 
-- one fixed-scope workflow review,
-- current AI/tool usage inventory,
+- `AI Agent Control Room`,
+- `$2,000/month`,
+- one active customer control-room engagement at a time until delivery is
+  repeatable,
+- AI/tool usage inventory,
 - control gap map,
 - recommended safe operating policy,
-- draft workflow for approval gates and auditability,
-- written implementation notes suitable for a non-sensitive public build log.
+- approval-gate and audit-trail workflow,
+- weekly operator-facing progress note,
+- public-safe build-in-public learning summary when approved.
 
-Initial pricing hypothesis: `$100` proof-of-loop package.
+MRR path: 10 active subscribers at `$2,000/month` reaches the `$20,000 MRR`
+gate. Ryan must not work on a second offer before that gate is reached.
 
 Excluded from the offer:
 
@@ -91,7 +96,7 @@ Before any draft is published:
 
 ## Next Validation Steps
 
-- Convert the offer hypothesis into a short public-safe landing/post draft.
+- Convert the subscription offer into a short public-safe WordPress draft.
 - Identify 3-5 beachhead customer segments for validation.
 - Draft a customer discovery interview guide before any outbound outreach.
 - Keep all outreach policy-gated and operator-approved.

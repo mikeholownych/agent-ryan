@@ -4,7 +4,7 @@ import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import sessionmaker
 
-from ryan.config import RevenueAllocationConfig, Settings
+from ryan.config import OfferConfig, RevenueAllocationConfig, Settings
 from ryan.db import Base, create_database_engine
 from ryan.models import Agent, KillSwitchState, Lead, Offer, PolicyRule, Wallet
 from ryan.seed import seed_mvp_data
@@ -92,6 +92,40 @@ def test_seed_mvp_data_is_idempotent(sqlite_session, sandbox_settings):
         model.__tablename__: count_rows(sqlite_session, model)
         for model in (Agent, Offer, Lead, PolicyRule, Wallet, KillSwitchState)
     } == counts_after_first_seed
+
+
+def test_seed_deactivates_active_offers_removed_from_configuration(
+    sqlite_session,
+    sandbox_settings,
+):
+    stale_offer = Offer(
+        id="stale-seed",
+        name="Stale Seed Offer",
+        price=Decimal("100.00"),
+        currency="USD",
+        status="active",
+        allowed_channels=["stripe_checkout"],
+    )
+    sqlite_session.add(stale_offer)
+    replacement_settings = sandbox_settings.model_copy(
+        update={
+            "offer_catalog": [
+                OfferConfig(
+                    id="ai-control-room-2000",
+                    name="AI Agent Control Room",
+                    price=Decimal("2000.00"),
+                    currency="USD",
+                    status="active",
+                    allowed_channels=["stripe_subscription"],
+                )
+            ]
+        }
+    )
+
+    seed_mvp_data(sqlite_session, replacement_settings)
+
+    assert sqlite_session.get(Offer, "stale-seed").status == "inactive"
+    assert sqlite_session.get(Offer, "ai-control-room-2000").status == "active"
 
 
 def test_seed_validation_fails_closed_when_offer_catalog_is_empty(

@@ -172,3 +172,80 @@ def test_sandbox_can_use_defaults_while_production_requires_explicit_values():
     )
 
     assert production.environment == "production"
+
+
+def test_production_can_load_revenue_loop_before_outbound_vendor_payment_rail():
+    production = Settings(
+        environment="production",
+        business_model=BusinessModelConfig(
+            name="Operator approved production business",
+            objective="Serve one explicitly approved production niche",
+            production_ready=True,
+        ),
+        offer_catalog=[
+            OfferConfig(
+                id="prod-offer-001",
+                name="Approved production offer",
+                price=Decimal("250.00"),
+                currency="USD",
+                status="active",
+                allowed_channels=["approved_checkout"],
+            )
+        ],
+        approved_demand_sources=[
+            DemandSourceConfig(
+                name="approved-production-source",
+                kind="manual_import",
+                status="approved",
+            )
+        ],
+        vendor_allowlist=[
+            VendorConfig(
+                name="approved-production-vendor",
+                categories=["software"],
+                status="approved",
+            )
+        ],
+        spend_threshold=SpendThresholdConfig(
+            per_transaction_cap=Decimal("25.00"),
+            currency="USD",
+        ),
+        category_budgets=[
+            CategoryBudgetConfig(
+                category="software",
+                limit=Decimal("100.00"),
+                currency="USD",
+                period="monthly",
+            )
+        ],
+        spend_time_windows=[
+            TimeWindowConfig(
+                name="business-hours",
+                start_hour_utc=9,
+                end_hour_utc=17,
+                days=["mon", "tue", "wed", "thu", "fri"],
+            )
+        ],
+        revenue_floor=Decimal("500.00"),
+        reserve_minimum=Decimal("250.00"),
+        revenue_allocation=RevenueAllocationConfig(
+            wallet_percentages={
+                AllocationTarget.REVENUE: Decimal("50"),
+                AllocationTarget.OPERATING: Decimal("30"),
+                AllocationTarget.RESERVE: Decimal("20"),
+            }
+        ),
+        operator_api_key="operator-production-key-32-bytes",
+        agent_api_key="agent-production-key-32-bytes",
+        payment_rail="stripe",
+        stripe_api_key="sk_live_test_value_for_validation",
+        stripe_webhook_secret="whsec_test_value_for_validation",
+        stripe_success_url="https://example.com/success",
+        stripe_cancel_url="https://example.com/cancel",
+        secret_backend="aws_secrets_manager",
+        hosting_environment="container",
+        _env_file=None,
+    )
+
+    assert production.outbound_payment_rail == "simulated"
+    assert production.outbound_payment_provider is None

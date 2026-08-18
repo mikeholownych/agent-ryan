@@ -181,11 +181,27 @@ The live AWS deployment uses:
 - Stripe cancel URL for the seed deployment:
   `https://api.agentryan.blog/health?checkout=cancel`.
 
+Ryan's autonomous business loop should run as a separate worker service using
+the same image and production configuration:
+
+- ECS service: `ryan-prod-autonomy`.
+- Command: `ryan-autonomy --seed`.
+- Required setting: `RYAN_AUTONOMY_ENABLED=true`.
+- Default cycle interval: `RYAN_AUTONOMY_CYCLE_SECONDS=900`.
+- Second-offer gate: `RYAN_AUTONOMY_MRR_SECOND_OFFER_GATE=20000.00`.
+
+The worker owns selecting one fastest-to-revenue offer, creating or reusing its
+checkout link, drafting build-in-public posts for `agentryan.blog`, drafting
+AgentMail approval requests from `agentryan@agentmail.to` to
+`mike.holownych@aisyndicate.io`, and blocking second-offer work until measured
+MRR reaches `$20,000`.
+
 Private ECS tasks require outbound egress for ECR, Secrets Manager, CloudWatch
 Logs, and Stripe. In the current AWS footprint, private subnet egress is routed
 through NAT gateway `nat-0f4348356905bd5fd`.
 
-The current seed policy is the operator-approved `$100` launch policy:
+The current first-offer policy is the operator-approved `$2,000/month` launch
+policy:
 
 - one active offer,
 - one approved demand source,
@@ -197,6 +213,11 @@ The current seed policy is the operator-approved `$100` launch policy:
 - reserve minimum `$40`,
 - revenue floor `$20`,
 - allocation policy `40%` operating, `40%` revenue, `20%` reserve.
+
+The first offer is `AI Agent Control Room` at `$2,000/month` through Stripe
+subscription Checkout. The `$20,000 MRR` second-offer gate requires 10 active
+subscribers at this price. The previous `seed-100` offer was a checkout plumbing
+seed and must not be treated as the go-to-market offer.
 
 The live Stripe Checkout Session creation path has been validated without
 completing a paid Checkout. A paid live Checkout completion and resulting Stripe

@@ -72,6 +72,7 @@ def _seed_agent(session: Session, settings: Settings) -> None:
 
 def _seed_offer(session: Session, settings: Settings) -> None:
     offer_config = next(offer for offer in settings.offer_catalog if offer.status == "active")
+    _deactivate_unconfigured_offers(session, settings)
     offer = session.get(Offer, offer_config.id)
     if offer is None:
         offer = Offer(
@@ -90,6 +91,13 @@ def _seed_offer(session: Session, settings: Settings) -> None:
     offer.currency = offer_config.currency
     offer.status = offer_config.status
     offer.allowed_channels = offer_config.allowed_channels
+
+
+def _deactivate_unconfigured_offers(session: Session, settings: Settings) -> None:
+    configured_offer_ids = {offer.id for offer in settings.offer_catalog}
+    for offer in session.scalars(select(Offer).where(Offer.status == "active")):
+        if offer.id not in configured_offer_ids:
+            offer.status = "inactive"
 
 
 def _seed_demand_source_placeholders(session: Session, settings: Settings) -> None:

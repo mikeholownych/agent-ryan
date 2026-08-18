@@ -5,6 +5,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from ryan.agent.router import router as agent_router
+from ryan.autonomy.router import router as autonomy_router
 from ryan.config import Settings, get_settings
 from ryan.operator.router import router as operator_router
 from ryan.payments.router import router as payment_router
@@ -59,6 +60,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(report_router)
     app.include_router(operator_router)
     app.include_router(agent_router)
+    app.include_router(autonomy_router)
     app.include_router(readiness_router)
 
     return app
@@ -82,6 +84,7 @@ def _role_can_access_path(*, role: str, path: str) -> bool:
             "/api/status",
             "/api/agent/console",
             "/api/payments/create",
+            "/api/autonomy/cycle",
         }
     return False
 

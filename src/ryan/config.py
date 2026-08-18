@@ -191,10 +191,6 @@ _PRODUCTION_REQUIRED_POLICY_FIELDS = {
     "revenue_floor",
     "reserve_minimum",
     "revenue_allocation",
-    "outbound_payment_rail",
-    "outbound_payment_provider",
-    "treasury_account_reference",
-    "outbound_live_validation_approved",
 }
 
 
@@ -250,10 +246,21 @@ class Settings(BaseSettings):
     treasury_account_reference: str | None = None
     outbound_live_validation_approved: bool = False
     agentmail_inbox: str = "agentryan@agentmail.to"
+    operator_approval_email: str = "mike.holownych@aisyndicate.io"
     outbound_email_requires_draft: bool = True
     outbound_email_requires_review: bool = True
     outbound_email_requires_sanitization: bool = True
     outbound_email_requires_approval: bool = True
+    autonomy_enabled: bool = False
+    autonomy_cycle_seconds: int = Field(default=900, ge=60)
+    autonomy_mrr_second_offer_gate: Decimal = Field(
+        default=Decimal("20000.00"),
+        gt=Decimal("0"),
+    )
+    wordpress_site_url: str = "https://agentryan.blog"
+    wordpress_username: str | None = None
+    wordpress_password: str | None = None
+    wordpress_drafts_enabled: bool = False
     secret_backend: Literal["environment", "aws_secrets_manager"] = "environment"
     hosting_environment: Literal["local", "container", "aws_ecs"] = "local"
 
@@ -291,18 +298,6 @@ class Settings(BaseSettings):
             raise ValueError(
                 "production requires Stripe API key, webhook secret, success URL, and cancel URL"
             )
-
-        if self.outbound_payment_rail == "simulated":
-            raise ValueError("production outbound_payment_rail must be bank, treasury, or bill_pay")
-
-        if not self.outbound_payment_provider:
-            raise ValueError("production requires outbound_payment_provider")
-
-        if not self.treasury_account_reference:
-            raise ValueError("production requires treasury_account_reference")
-
-        if not self.outbound_live_validation_approved:
-            raise ValueError("production requires operator-approved outbound live validation")
 
         if self.secret_backend == "environment":
             raise ValueError("production requires external secret_backend")

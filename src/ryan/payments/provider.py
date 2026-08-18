@@ -96,23 +96,27 @@ class StripePaymentProvider:
         self,
         request: ProviderCheckoutRequest,
     ) -> ProviderCheckoutResult:
+        data = {
+            "mode": _stripe_checkout_mode(request.channel),
+            "success_url": self.success_url,
+            "cancel_url": self.cancel_url,
+            "line_items[0][price_data][currency]": request.currency.lower(),
+            "line_items[0][price_data][unit_amount]": str(
+                _minor_units(request.amount)
+            ),
+            "line_items[0][price_data][product_data][name]": (
+                request.offer_name or request.offer_id
+            ),
+            "line_items[0][quantity]": "1",
+            "metadata[offer_id]": request.offer_id,
+            "metadata[channel]": request.channel,
+        }
+        if data["mode"] == "subscription":
+            data["line_items[0][price_data][recurring][interval]"] = "month"
+
         response = self.http_client.post(
             STRIPE_CHECKOUT_SESSIONS_URL,
-            data={
-                "mode": "payment",
-                "success_url": self.success_url,
-                "cancel_url": self.cancel_url,
-                "line_items[0][price_data][currency]": request.currency.lower(),
-                "line_items[0][price_data][unit_amount]": str(
-                    _minor_units(request.amount)
-                ),
-                "line_items[0][price_data][product_data][name]": (
-                    request.offer_name or request.offer_id
-                ),
-                "line_items[0][quantity]": "1",
-                "metadata[offer_id]": request.offer_id,
-                "metadata[channel]": request.channel,
-            },
+            data=data,
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Idempotency-Key": request.idempotency_key or str(uuid4()),
@@ -130,6 +134,12 @@ class StripePaymentProvider:
 
 def _minor_units(amount: Decimal) -> int:
     return int((amount * Decimal("100")).quantize(Decimal("1")))
+
+
+def _stripe_checkout_mode(channel: str) -> str:
+    if channel == "stripe_subscription":
+        return "subscription"
+    return "payment"
 
 
 __all__ = [

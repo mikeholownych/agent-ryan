@@ -64,3 +64,30 @@ def test_stripe_provider_creates_checkout_session_with_idempotency_key():
     assert call["data"]["line_items[0][price_data][currency]"] == "usd"
     assert call["data"]["line_items[0][quantity]"] == "1"
     assert call["data"]["metadata[offer_id]"] == "offer-001"
+
+
+def test_stripe_provider_creates_subscription_checkout_for_subscription_channel():
+    http_client = FakeHttpClient()
+    provider = StripePaymentProvider(
+        api_key="sk_live_test",
+        success_url="https://example.com/success",
+        cancel_url="https://example.com/cancel",
+        http_client=http_client,
+    )
+
+    provider.create_checkout(
+        ProviderCheckoutRequest(
+            offer_id="offer-subscription",
+            amount=Decimal("2000.00"),
+            currency="USD",
+            channel="stripe_subscription",
+            offer_name="AI Agent Control Room",
+            idempotency_key="subscription-create-001",
+        )
+    )
+
+    call = http_client.calls[0]
+    assert call["data"]["mode"] == "subscription"
+    assert call["data"]["line_items[0][price_data][unit_amount]"] == "200000"
+    assert call["data"]["line_items[0][price_data][recurring][interval]"] == "month"
+    assert call["data"]["metadata[channel]"] == "stripe_subscription"
